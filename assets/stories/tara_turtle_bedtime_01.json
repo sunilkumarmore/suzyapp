@@ -1,0 +1,42 @@
+{
+  "id": "tara_turtle_bedtime_01",
+  "title": "Tara the Turtle Gets Ready for Bed",
+  "ageBand": "2–3",
+  "language": "en",
+  "difficulty": 1,
+  "pages": [
+    {
+      "text": "The sky turns pink, then deep-blue spread,\nTara the Turtle feels sleepy instead.",
+      "imageAsset": "assets/images/tara_01_sky_changes.png"
+    },
+    {
+      "text": "Clouds float by. The sun says bye.\nA tiny yawn slips from Tara’s eye.",
+      "imageAsset": "assets/images/tara_02_yawn_window.png"
+    },
+    {
+      "text": "Brush-brush teeth, slow and neat,\nLittle turtle taps her feet.",
+      "imageAsset": "assets/images/tara_03_brush_teeth.png"
+    },
+    {
+      "text": "Pajamas on — soft and snug,\nTara smiles at a bedtime hug.",
+      "imageAsset": "assets/images/tara_04_pajamas_hug.png"
+    },
+    {
+      "text": "Lamp glows low with gentle light,\nWalls feel warm and calm tonight.",
+      "imageAsset": "assets/images/tara_05_lamp_room.png"
+    },
+    {
+      "text": "Book goes flip. The words go slow.\nA quiet story, soft and low.",
+      "imageAsset": "assets/images/tara_06_story_time.png"
+    },
+    {
+      "text": "Moon peeks in through window square,\nStars wink back — they know she’s there.",
+      "imageAsset": "assets/images/tara_07_moon_window.png"
+    },
+    {
+      "text": "Shell curls in. Breath goes deep.\nTara smiles… fast asleep.",
+      "imageAsset": "assets/images/tara_08_sleeping.png"
+    }
+  ],
+  "completedMessage": "🌙 Sweet dreams. Your body knows when it’s time to rest."
+}

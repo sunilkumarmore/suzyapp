@@ -1,0 +1,42 @@
+{
+  "id": "oliver_bear_potty_01",
+  "title": "Oliver the Bear Finds His Pot",
+  "ageBand": "2–3",
+  "language": "en",
+  "difficulty": 1,
+  "pages": [
+    {
+      "text": "Oliver Bear wiggles his toes,\nSomething bubbles — nobody knows.",
+      "imageAsset": "assets/images/oliver_01_wiggle.png"
+    },
+    {
+      "text": "He sways and swishes, round and round,\nA tiny tummy makes a sound.",
+      "imageAsset": "assets/images/oliver_02_uh_oh.png"
+    },
+    {
+      "text": "His tummy says, \"Uh-oh!\" soft and slow,\nOliver pauses. Time to go.",
+      "imageAsset": "assets/images/oliver_03_walk_to_potty.png"
+    },
+    {
+      "text": "Tip-tap steps to the little white pot,\nHe sits very still. He waits a lot.",
+      "imageAsset": "assets/images/oliver_04_sitting.png"
+    },
+    {
+      "text": "Quiet moment. Breathe in… out.\nOliver waits without a shout.",
+      "imageAsset": "assets/images/oliver_05_waiting.png"
+    },
+    {
+      "text": "Drip-drop sounds! A happy surprise,\nOliver’s ears grow big with pride.",
+      "imageAsset": "assets/images/oliver_06_success.png"
+    },
+    {
+      "text": "He wipes and washes, splish and splash,\nClean little paws — quick as a flash.",
+      "imageAsset": "assets/images/oliver_07_wash_hands.png"
+    },
+    {
+      "text": "Oliver cheers, strong and tall,\n\"I did it myself!\" best bear call of all.",
+      "imageAsset": "assets/images/oliver_08_celebrate.png"
+    }
+  ],
+  "completedMessage": "🎉 Hooray! Oliver tried and finished. Great job!"
+}

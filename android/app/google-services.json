@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "604575451488",
+    "project_id": "suzyapp",
+    "storage_bucket": "suzyapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:604575451488:android:987d6a1f3bdcc7cd23b605",
+        "android_client_info": {
+          "package_name": "com.example.suzyapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB4r5hjKv79dc3bqJvew0nVEe7KZRCPpHM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
