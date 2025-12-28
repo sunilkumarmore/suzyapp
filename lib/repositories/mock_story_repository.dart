@@ -3,6 +3,8 @@ import '../models/story_dto.dart';
 import 'asset_story_loader.dart';
 import 'story_repository.dart';
 
+
+
 class MockStoryRepository implements StoryRepository {
   List<Story>? _cache;
 
@@ -21,13 +23,15 @@ Story _toDomain(StoryDto d) {
     ageBand: d.ageBand,
    pages: List.generate(d.pages.length, (i) {
   final p = d.pages[i];
-  return StoryPage(
-    index: i,
-    text: p.text,
-    imageUrl: p.imageUrl,
-    imageAsset: p.imageAsset,
-    choices: const [],
-  );
+ return StoryPage(
+  index: i,
+  text: p.text,
+  imageUrl: p.imageUrl,
+  imageAsset: p.imageAsset,
+  audioUrl: p.audioUrl,
+  audioAsset: p.audioAsset,
+  choices: const [],
+);
 }),
 
   );

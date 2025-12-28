@@ -4,7 +4,7 @@ class Story {
   final String language; // 'en' | 'te' | 'mixed'
   //final String difficulty; // 'Easy' | 'Medium' | 'Hard'
   final List<StoryPage> pages;
-  final String ageBand; // e.g. '2-3', '4-5', '6-7'
+  final String ageBand; // e.g. '2-3', '4-5', '6-7',
 
   Story({
     required this.id,
@@ -21,13 +21,17 @@ class StoryPage {
   final String? imageUrl;
   final String? imageAsset;
   final List<StoryChoice> choices;
+  final String? audioUrl;
+final String? audioAsset;
 
   StoryPage({
     required this.index,
-    required this.text,
-    this.imageUrl,
-    this.imageAsset,
-    this.choices = const [],
+  required this.text,
+  this.imageUrl,
+  this.imageAsset,
+  this.audioUrl,
+  this.audioAsset,
+  this.choices = const [],
   });
 
   bool get hasChoices => choices.isNotEmpty;

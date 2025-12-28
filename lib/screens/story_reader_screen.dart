@@ -9,6 +9,10 @@ import '../repositories/progress_repository.dart';
 import '../repositories/story_repository.dart';
 import 'story_completion_screen.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_tts/flutter_tts.dart';
 
 class StoryReaderScreen extends StatefulWidget {
   final StoryRepository storyRepository;
@@ -29,12 +33,17 @@ class StoryReaderScreen extends StatefulWidget {
 }
 
 class _StoryReaderScreenState extends State<StoryReaderScreen> {
+  bool _readAloudEnabled = false;
   late Future<Story> _future;
   bool _completionShown = false;
   int _pageIndex = 0;
   Story? _storyCache;
   final FlutterTts _tts = FlutterTts();
 bool _isSpeaking = false;
+final AudioPlayer _player = AudioPlayer();
+
+bool _isPlayingAudio = false;
+bool _isSpeakingTts = false;
 
 Future<void> _initTts() async {
   // Speaking state callbacks (works on most platforms)
@@ -49,17 +58,85 @@ Future<void> _initTts() async {
 }
 
   @override
-  void initState() {
-    super.initState();
-    _pageIndex = widget.startPageIndex ?? 0;
-    _future = widget.storyRepository.getStoryById(widget.storyId);
-     _initTts();
-  }
+ @override
+void initState() {
+  super.initState();
+  _pageIndex = widget.startPageIndex ?? 0;
+  _future = widget.storyRepository.getStoryById(widget.storyId);
+
+  _player.playerStateStream.listen((state) {
+    final playing = state.playing;
+    if (mounted) setState(() => _isPlayingAudio = playing);
+  });
+
+  _tts.setStartHandler(() => mounted ? setState(() => _isSpeakingTts = true) : null);
+  _tts.setCompletionHandler(() => mounted ? setState(() => _isSpeakingTts = false) : null);
+  _tts.setCancelHandler(() => mounted ? setState(() => _isSpeakingTts = false) : null);
+  _tts.setErrorHandler((_) => mounted ? setState(() => _isSpeakingTts = false) : null);
+
+  _tts.setSpeechRate(0.45);
+  _tts.setPitch(1.05);
+  _tts.setVolume(1.0);
+}
 
 @override
 void dispose() {
-  _tts.stop();
+  _stopAllAudio();
+  _player.dispose();
   super.dispose();
+}
+
+Future<void> _playReadAloud(Story story, StoryPage page) async {
+  await _stopAllAudio();
+
+  // 1) URL first (primary)
+  final url = page.audioUrl;
+  if (url != null && url.trim().isNotEmpty) {
+    try {
+      if (kIsWeb) {
+        await _player.setUrl(url);
+      } else {
+        final file = await DefaultCacheManager().getSingleFile(url);
+        await _player.setFilePath(file.path);
+      }
+      await _player.play();
+      return; // ✅ IMPORTANT: do not continue to TTS
+    } catch (_) {
+      // fall through to next
+    }
+  }
+
+  // 2) Asset second (offline pack)
+  final asset = page.audioAsset;
+  if (asset != null && asset.trim().isNotEmpty) {
+    try {
+      await _player.setAsset(asset);
+      await _player.play();
+      return; // ✅ IMPORTANT
+    } catch (_) {
+      // fall through to TTS
+    }
+  }
+
+  // 3) TTS final fallback
+  final lang = story.language.toLowerCase();
+  if (lang == 'te') {
+    await _tts.setLanguage('te-IN');
+  } else {
+    await _tts.setLanguage('en-US');
+  }
+  if (lang == 'mixed') await _tts.setLanguage('en-US');
+
+  await _tts.speak(page.text);
+}
+
+Future<void> _stopAllAudio() async {
+  await _player.stop();
+  await _tts.stop();
+  if (mounted) setState(() {
+    _isPlayingAudio = false;
+    _isSpeakingTts = false;
+  });
 }
   int _imageFlexFor(String ageBand, String text) {
     final len = text.trim().length;
@@ -120,6 +197,7 @@ void dispose() {
 
     if (isCompleted && !_completionShown && mounted) {
       _completionShown = true;
+      await _stopAllAudio();
       Navigator.pushNamed(
         context,
         '/complete',
@@ -132,10 +210,19 @@ void dispose() {
   }
 
   Future<void> _setPage(int newIndex) async {
-    await _tts.stop(); // ✅ important
+
+    await _stopAllAudio();
   setState(() => _pageIndex = newIndex);
   await _saveReadingProgress();
   await _saveStoryProgress();
+  
+  if (_readAloudEnabled) {
+    final story = _storyCache;
+    if (story != null) {
+      final page = story.pages[_pageIndex];
+      await _playReadAloud(story, page);
+    }
+  }
   }
 
   Widget _buildPageImage(StoryPage page) {
@@ -147,7 +234,7 @@ void dispose() {
         borderRadius: BorderRadius.circular(AppRadius.large),
         child: Image.asset(
           imgAsset,
-          fit: BoxFit.cover,
+          fit: BoxFit.contain,
           width: double.infinity,
           height: double.infinity,
         ),
@@ -159,7 +246,7 @@ void dispose() {
         borderRadius: BorderRadius.circular(AppRadius.large),
         child: Image.network(
           imgUrl,
-          fit: BoxFit.cover,
+          fit: BoxFit.contain,
           width: double.infinity,
           height: double.infinity,
         ),
@@ -198,23 +285,25 @@ Future<void> _speakCurrentPage(Story story, StoryPage page) async {
   title: const Text('Read'),
   backgroundColor: AppColors.background,
   elevation: 0,
-  actions: [
-    IconButton(
-      tooltip: _isSpeaking ? 'Stop' : 'Read aloud',
-      icon: Icon(_isSpeaking ? Icons.stop_circle : Icons.volume_up),
-      onPressed: () async {
-        final story = _storyCache;
-        if (story == null) return;
-        final page = story.pages[_pageIndex];
+ actions: [
+  IconButton(
+    tooltip: _readAloudEnabled ? 'Read aloud: On' : 'Read aloud: Off',
+    icon: Icon(_readAloudEnabled ? Icons.volume_up : Icons.volume_off),
+    onPressed: () async {
+      final story = _storyCache;
+      if (story == null) return;
 
-        if (_isSpeaking) {
-          await _tts.stop();
-        } else {
-          await _speakCurrentPage(story, page);
-        }
-      },
-    ),
-  ],
+      setState(() => _readAloudEnabled = !_readAloudEnabled);
+
+      if (_readAloudEnabled) {
+        final page = story.pages[_pageIndex];
+        await _playReadAloud(story, page);
+      } else {
+        await _stopAllAudio();
+      }
+    },
+  ),
+],
 ),
       body: FutureBuilder<Story>(
         future: _future,

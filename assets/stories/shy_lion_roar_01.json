@@ -1,0 +1,46 @@
+{
+  "id": "shy_lion_roar_01",
+  "title": "The Shy Lion Finds His Roar",
+  "ageBand": "4–5",
+  "language": "en",
+  "difficulty": 2,
+  "pages": [
+    {
+      "text": "Leo the Lion had a big fluffy mane,\nBut talking out loud made him feel quite plain.\nHe’d open his mouth… then close it tight.\nWords stayed inside — day and night.",
+      "imageAsset": "images/shy_lion_roar/shy_lion_01_intro.png", 
+      "audioAsset": "audio/shy_lion_roar/shy_lion_01_intro.mp3"
+    },
+    {
+      "text": "At jungle school, friends laughed and played,\nShared fun stories and plans they’d made.\nLeo listened, his ideas grew,\nSmart little thoughts — he knew they were true.",
+      "imageAsset": "images/shy_lion_roar/shy_lion_02_classroom.png",
+      "audioAsset": "audio/shy_lion_roar/shy_lion_02_classroom.mp3"
+    },
+    {
+      "text": "One sunny day, a game went wrong.\nThe rules got mixed — it took too long.\nVoices bumped. The game stood still.\nNo one knew just what to do… until—",
+      "imageAsset": "images/shy_lion_roar/shy_lion_03_problem.png",
+      "audioAsset": "audio/shy_lion_roar/shy_lion_03_problem.mp3"
+    },
+    {
+      "text": "Leo’s heart thumped thump-thump-thump.\nHis paws felt tight. His tummy went jump.\nHe knew the answer, simple and fair,\nA quiet idea floating there.",
+      "imageAsset": "images/shy_lion_roar/shy_lion_04_thinking.png",
+      "audioAsset": "audio/shy_lion_roar/shy_lion_04_thinking.mp3"
+    },
+    {
+      "text": "Leo spoke softly, slow and clear.\nNot too loud — but friends leaned near.\n“Let’s take turns,” said Leo low.\nThe jungle paused… then smiled — you know.",
+      "imageAsset": "images/shy_lion_roar/shy_lion_05_speaking.png",
+      "audioAsset": "audio/shy_lion_roar/shy_lion_05_speaking.mp3"
+    },
+    {
+      "text": "The game began. Laughter grew.\nClap-clap-clap! “Good thinking, you!”\nLeo didn’t shout. He didn’t roar.\nBut inside, he felt something more.",
+      "imageAsset": "images/shy_lion_roar/shy_lion_06_solution.png",
+      "audioAsset": "audio/shy_lion_roar/shy_lion_06_solution.mp3"
+    },
+    {
+      "text": "Leo learned something kind and true:\nA roar isn’t loud — it’s being you.\nWhen you speak, in your own small way,\nYour voice can help make a brighter day.",
+      "imageAsset": "images/shy_lion_roar/shy_lion_07_lesson.png",
+      "audioAsset": "audio/shy_lion_roar/shy_lion_07_lesson.mp3"
+    }
+  ],
+  "completedMessage": "🦁 You don’t have to roar loud to be brave. Your voice matters."
+}
+
