@@ -4,10 +4,10 @@ import '../design_system/app_colors.dart';
 import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
 import '../design_system/app_typography.dart';
-import '../main.dart';
 import '../models/reading_progress.dart';
 import '../repositories/progress_repository.dart';
 import '../repositories/story_repository.dart';
+import '../main.dart'; // for StoryReaderArgs if defined there
 
 class HomeScreen extends StatefulWidget {
   final StoryRepository storyRepository;
@@ -79,12 +79,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 _BigTile(
                   title: 'Story Library',
                   subtitle: 'Pick a new adventure',
-                  color: AppColors.primaryBlue,
+                  color: AppColors.tileBlue,
                   icon: Icons.menu_book,
                   onTap: () => Navigator.pushNamed(context, '/library')
                       .then((_) => _loadProgress()),
                 ),
-              ] else
+                const SizedBox(height: AppSpacing.medium),
+
+                // NEW: Create a Story tile (does NOT affect existing tiles)
+                 
+              _BigTile(
+  title: 'Create a Story',
+  subtitle: 'Pick characters and make your own',
+  color: AppColors.tileYellow, // or AppColors.accentCoral if you prefer
+  icon: Icons.auto_stories,
+  onTap: () => Navigator.pushNamed(context, '/create'),
+),
+              ] else ...[
                 Row(
                   children: [
                     Expanded(
@@ -97,15 +108,30 @@ class _HomeScreenState extends State<HomeScreen> {
                             .then((_) => _loadProgress()),
                       ),
                     ),
+                    const SizedBox(width: AppSpacing.medium),
+                    Expanded(
+                      child: _BigTile(
+        title: 'Create a Story',
+        subtitle: 'Pick characters and make your own',
+        color: AppColors.tileYellow,
+        icon: Icons.auto_stories,
+        onTap: () => Navigator.pushNamed(context, '/create'),
+                    ),
+                    ),
                   ],
                 ),
-                Align(
-  alignment: Alignment.centerRight,
-  child: TextButton(
-    onPressed: () => Navigator.pushNamed(context, '/parents'),
-    child: const Text('Parents'),
-  ),
-),
+              ],
+
+              const Spacer(),
+
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  // use the route you already have in main.dart
+                  onPressed: () => Navigator.pushNamed(context, '/parent-summary'),
+                  child: const Text('Parents'),
+                ),
+              ),
             ],
           ),
         ),
@@ -181,8 +207,8 @@ class _BigTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.large),
+      onTap: onTap,
       child: Container(
         height: 120,
         padding: const EdgeInsets.symmetric(
@@ -209,6 +235,55 @@ class _BigTile extends StatelessWidget {
               ),
             ),
             const Icon(Icons.chevron_right, size: 34, color: Colors.white),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CreateTile extends StatelessWidget {
+  final VoidCallback onTap;
+  const _CreateTile({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppRadius.large),
+      onTap: onTap,
+      child: Container(
+        height: 120,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.large,
+          vertical: AppSpacing.medium,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.large),
+          border: Border.all(color: Colors.black12),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.auto_stories, size: 42),
+            const SizedBox(width: AppSpacing.medium),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Create a Story',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  ),
+                  SizedBox(height: AppSpacing.xsmall),
+                  Text(
+                    'Pick characters and make your own',
+                    style: TextStyle(fontSize: 14, height: 1.2),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, size: 34),
           ],
         ),
       ),

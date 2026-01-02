@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:just_audio/just_audio.dart';
+
 import '../design_system/app_colors.dart';
 import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
@@ -7,12 +12,8 @@ import '../models/story.dart';
 import '../models/story_progress.dart';
 import '../repositories/progress_repository.dart';
 import '../repositories/story_repository.dart';
+import '../widgets/adventure_scene.dart';
 import 'story_completion_screen.dart';
-import 'package:flutter_tts/flutter_tts.dart';
-import 'package:just_audio/just_audio.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter_tts/flutter_tts.dart';
 
 class StoryReaderScreen extends StatefulWidget {
   final StoryRepository storyRepository;
@@ -33,135 +34,113 @@ class StoryReaderScreen extends StatefulWidget {
 }
 
 class _StoryReaderScreenState extends State<StoryReaderScreen> {
-  bool _readAloudEnabled = false;
   late Future<Story> _future;
-  bool _completionShown = false;
-  int _pageIndex = 0;
   Story? _storyCache;
+
+  int _pageIndex = 0;
+  bool _completionShown = false;
+
+  // Read aloud state
+  bool _readAloudEnabled = false;
+  bool _isPlayingAudio = false;
+  bool _isSpeakingTts = false;
+
+  final AudioPlayer _player = AudioPlayer();
   final FlutterTts _tts = FlutterTts();
-bool _isSpeaking = false;
-final AudioPlayer _player = AudioPlayer();
-
-bool _isPlayingAudio = false;
-bool _isSpeakingTts = false;
-
-Future<void> _initTts() async {
-  // Speaking state callbacks (works on most platforms)
-  _tts.setStartHandler(() => setState(() => _isSpeaking = true));
-  _tts.setCompletionHandler(() => setState(() => _isSpeaking = false));
-  _tts.setCancelHandler(() => setState(() => _isSpeaking = false));
-  _tts.setErrorHandler((_) => setState(() => _isSpeaking = false));
-
-  await _tts.setSpeechRate(0.45); // slower for kids
-  await _tts.setPitch(1.05);
-  await _tts.setVolume(1.0);
-}
 
   @override
- @override
-void initState() {
-  super.initState();
-  _pageIndex = widget.startPageIndex ?? 0;
-  _future = widget.storyRepository.getStoryById(widget.storyId);
+  void initState() {
+    super.initState();
 
-  _player.playerStateStream.listen((state) {
-    final playing = state.playing;
-    if (mounted) setState(() => _isPlayingAudio = playing);
-  });
+    _pageIndex = widget.startPageIndex ?? 0;
+    _future = widget.storyRepository.getStoryById(widget.storyId);
 
-  _tts.setStartHandler(() => mounted ? setState(() => _isSpeakingTts = true) : null);
-  _tts.setCompletionHandler(() => mounted ? setState(() => _isSpeakingTts = false) : null);
-  _tts.setCancelHandler(() => mounted ? setState(() => _isSpeakingTts = false) : null);
-  _tts.setErrorHandler((_) => mounted ? setState(() => _isSpeakingTts = false) : null);
+    // Track audio state
+    _player.playerStateStream.listen((state) {
+      if (!mounted) return;
+      setState(() => _isPlayingAudio = state.playing);
+    });
 
-  _tts.setSpeechRate(0.45);
-  _tts.setPitch(1.05);
-  _tts.setVolume(1.0);
-}
+    // Track TTS state
+    _tts.setStartHandler(() => mounted ? setState(() => _isSpeakingTts = true) : null);
+    _tts.setCompletionHandler(() => mounted ? setState(() => _isSpeakingTts = false) : null);
+    _tts.setCancelHandler(() => mounted ? setState(() => _isSpeakingTts = false) : null);
+    _tts.setErrorHandler((_) => mounted ? setState(() => _isSpeakingTts = false) : null);
 
-@override
-void dispose() {
-  _stopAllAudio();
-  _player.dispose();
-  super.dispose();
-}
+    // Kid-friendly defaults
+    _tts.setSpeechRate(0.45);
+    _tts.setPitch(1.05);
+    _tts.setVolume(1.0);
+  }
 
-Future<void> _playReadAloud(Story story, StoryPage page) async {
-  await _stopAllAudio();
+  @override
+  void dispose() {
+    _stopAllAudio(); // stop before dispose
+    _player.dispose();
+    super.dispose();
+  }
 
-  // 1) URL first (primary)
-  final url = page.audioUrl;
-  if (url != null && url.trim().isNotEmpty) {
+  // ---------- Audio helpers ----------
+
+  Future<void> _stopAllAudio() async {
     try {
-      if (kIsWeb) {
-        await _player.setUrl(url);
-      } else {
-        final file = await DefaultCacheManager().getSingleFile(url);
-        await _player.setFilePath(file.path);
+      await _player.stop();
+    } catch (_) {}
+    try {
+      await _tts.stop();
+    } catch (_) {}
+
+    if (!mounted) return;
+    setState(() {
+      _isPlayingAudio = false;
+      _isSpeakingTts = false;
+    });
+  }
+
+  Future<void> _playReadAloud(Story story, StoryPage page) async {
+    await _stopAllAudio();
+
+    // 1) URL first (primary)
+    final url = page.audioUrl;
+    if (url != null && url.trim().isNotEmpty) {
+      try {
+        if (kIsWeb) {
+          await _player.setUrl(url);
+        } else {
+          final file = await DefaultCacheManager().getSingleFile(url);
+          await _player.setFilePath(file.path);
+        }
+        await _player.play();
+        return; // ✅ do not fall through
+      } catch (_) {
+        // fall through to asset/TTS
       }
-      await _player.play();
-      return; // ✅ IMPORTANT: do not continue to TTS
-    } catch (_) {
-      // fall through to next
-    }
-  }
-
-  // 2) Asset second (offline pack)
-  final asset = page.audioAsset;
-  if (asset != null && asset.trim().isNotEmpty) {
-    try {
-      await _player.setAsset(asset);
-      await _player.play();
-      return; // ✅ IMPORTANT
-    } catch (_) {
-      // fall through to TTS
-    }
-  }
-
-  // 3) TTS final fallback
-  final lang = story.language.toLowerCase();
-  if (lang == 'te') {
-    await _tts.setLanguage('te-IN');
-  } else {
-    await _tts.setLanguage('en-US');
-  }
-  if (lang == 'mixed') await _tts.setLanguage('en-US');
-
-  await _tts.speak(page.text);
-}
-
-Future<void> _stopAllAudio() async {
-  await _player.stop();
-  await _tts.stop();
-  if (mounted) setState(() {
-    _isPlayingAudio = false;
-    _isSpeakingTts = false;
-  });
-}
-  int _imageFlexFor(String ageBand, String text) {
-    final len = text.trim().length;
-
-    int shortMax;
-    int mediumMax;
-
-    switch (ageBand) {
-      case '2-3':
-        shortMax = 45;
-        mediumMax = 90;
-        break;
-      case '4-5':
-        shortMax = 90;
-        mediumMax = 180;
-        break;
-      default: // '6-7'
-        shortMax = 140;
-        mediumMax = 260;
     }
 
-    if (len <= shortMax) return 6; // image dominates
-    if (len <= mediumMax) return 5; // balanced
-    return 4; // text needs more room
+    // 2) Asset second (offline pack)
+    final asset = page.audioAsset;
+    if (asset != null && asset.trim().isNotEmpty) {
+      try {
+        await _player.setAsset(asset);
+        await _player.play();
+        return; // ✅ do not fall through
+      } catch (_) {
+        // fall through to TTS
+      }
+    }
+
+    // 3) TTS fallback
+    final lang = story.language.toLowerCase();
+    if (lang == 'te') {
+      await _tts.setLanguage('te-IN');
+    } else {
+      await _tts.setLanguage('en-US');
+    }
+    // for mixed in v1, keep en-US
+    await _tts.speak(page.text);
   }
+
+  // ---------- Progress helpers ----------
 
   Future<void> _saveReadingProgress() async {
     final story = _storyCache;
@@ -169,7 +148,6 @@ Future<void> _stopAllAudio() async {
 
     final int clamped = (_pageIndex.clamp(0, story.pages.length - 1) as int);
 
-    // Keep backward-compat call, since your ProgressRepository supports it
     await widget.progressRepository.saveProgress(
       ReadingProgress(
         storyId: widget.storyId,
@@ -210,101 +188,110 @@ Future<void> _stopAllAudio() async {
   }
 
   Future<void> _setPage(int newIndex) async {
-
-    await _stopAllAudio();
-  setState(() => _pageIndex = newIndex);
-  await _saveReadingProgress();
-  await _saveStoryProgress();
-  
-  if (_readAloudEnabled) {
     final story = _storyCache;
-    if (story != null) {
+    if (story == null) return;
+
+    // Stop current audio before switching pages
+    await _stopAllAudio();
+
+    setState(() => _pageIndex = newIndex);
+
+    await _saveReadingProgress();
+    await _saveStoryProgress();
+
+    // Auto read if enabled
+    if (_readAloudEnabled) {
       final page = story.pages[_pageIndex];
       await _playReadAloud(story, page);
     }
   }
+
+  // ---------- Layout helpers ----------
+
+  int _imageFlexFor(String ageBand, String text) {
+    final len = text.trim().length;
+
+    int shortMax;
+    int mediumMax;
+
+    switch (ageBand) {
+      case '2-3':
+        shortMax = 45;
+        mediumMax = 90;
+        break;
+      case '4-5':
+        shortMax = 90;
+        mediumMax = 180;
+        break;
+      default: // '6-7'
+        shortMax = 140;
+        mediumMax = 260;
+    }
+
+    if (len <= shortMax) return 6;
+    if (len <= mediumMax) return 5;
+    return 4;
   }
 
-  Widget _buildPageImage(StoryPage page) {
-    final imgAsset = page.imageAsset;
-    final imgUrl = page.imageUrl;
+  // Basic mapping from existing StoryPage fields (imageAsset/imageUrl) to scene.
+  // If you later add heroAsset/backgroundAsset/etc to StoryPage, wire them here.
+  Widget _buildSceneOrImage(StoryPage page) {
+    // If you only have a single illustration per page, use it as background.
+    // For generated adventures, you’ll supply background/hero/friend/object/emotion.
+    final bg = page.imageAsset;
 
-    if (imgAsset != null && imgAsset.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.large),
-        child: Image.asset(
-          imgAsset,
-          fit: BoxFit.contain,
-          width: double.infinity,
-          height: double.infinity,
-        ),
+    if (bg != null && bg.isNotEmpty) {
+      return AdventureScene(
+        backgroundAsset: bg,
+        // heroAsset/friendAsset/objectAsset/emotionEmoji can be added later
+        emotionEmoji: null,
       );
     }
 
-    if (imgUrl != null && imgUrl.isNotEmpty) {
+    final url = page.imageUrl;
+    if (url != null && url.isNotEmpty) {
+      // AdventureScene expects assets; if you want network backgrounds later, we can extend it.
+      // For now, fallback to Image.network.
       return ClipRRect(
         borderRadius: BorderRadius.circular(AppRadius.large),
-        child: Image.network(
-          imgUrl,
-          fit: BoxFit.contain,
-          width: double.infinity,
-          height: double.infinity,
-        ),
+        child: Image.network(url, fit: BoxFit.cover),
       );
     }
 
     return const Center(child: Icon(Icons.image, size: 56));
   }
 
-Future<void> _speakCurrentPage(Story story, StoryPage page) async {
-  // Stop anything already speaking
-  await _tts.stop();
-
-  // Pick a language code (basic)
-  final lang = story.language.toLowerCase();
-  if (lang == 'te') {
-    await _tts.setLanguage('te-IN'); // Telugu
-  } else {
-    await _tts.setLanguage('en-US'); // English default
-  }
-
-  // For mixed, you can keep en-US for v1, or detect script later
-  if (lang == 'mixed') {
-    await _tts.setLanguage('en-US');
-  }
-
-  await _tts.speak(page.text);
-}
-
+  // ---------- UI ----------
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-   appBar: AppBar(
-  title: const Text('Read'),
-  backgroundColor: AppColors.background,
-  elevation: 0,
- actions: [
-  IconButton(
-    tooltip: _readAloudEnabled ? 'Read aloud: On' : 'Read aloud: Off',
-    icon: Icon(_readAloudEnabled ? Icons.volume_up : Icons.volume_off),
-    onPressed: () async {
-      final story = _storyCache;
-      if (story == null) return;
+      appBar: AppBar(
+        title: const Text('Read'),
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: _readAloudEnabled ? 'Read aloud: On' : 'Read aloud: Off',
+            icon: Icon(_readAloudEnabled ? Icons.volume_up : Icons.volume_off),
+            onPressed: () async {
+              final story = _storyCache;
+              if (story == null) return;
 
-      setState(() => _readAloudEnabled = !_readAloudEnabled);
+              final toggledOn = !_readAloudEnabled;
+              setState(() => _readAloudEnabled = toggledOn);
 
-      if (_readAloudEnabled) {
-        final page = story.pages[_pageIndex];
-        await _playReadAloud(story, page);
-      } else {
-        await _stopAllAudio();
-      }
-    },
-  ),
-],
-),
+              if (toggledOn) {
+                final page = story.pages[_pageIndex];
+                await _playReadAloud(story, page);
+              } else {
+                await _stopAllAudio();
+              }
+            },
+          ),
+        ],
+      ),
       body: FutureBuilder<Story>(
         future: _future,
         builder: (context, snap) {
@@ -312,11 +299,11 @@ Future<void> _speakCurrentPage(Story story, StoryPage page) async {
             return const Center(child: CircularProgressIndicator());
           }
           if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
+
           final story = snap.data!;
           _storyCache = story;
 
-          final int safeIndex =
-              (_pageIndex.clamp(0, story.pages.length - 1) as int);
+          final int safeIndex = (_pageIndex.clamp(0, story.pages.length - 1) as int);
           if (safeIndex != _pageIndex) _pageIndex = safeIndex;
 
           final page = story.pages[_pageIndex];
@@ -331,10 +318,7 @@ Future<void> _speakCurrentPage(Story story, StoryPage page) async {
               children: [
                 Text(
                   story.title,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: AppSpacing.medium),
 
@@ -346,7 +330,13 @@ Future<void> _speakCurrentPage(Story story, StoryPage page) async {
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(AppRadius.large),
                     ),
-                    child: _buildPageImage(page),
+                  child: AdventureScene(
+  backgroundAsset: page.backgroundAsset ?? page.imageAsset,
+  heroAsset: page.heroAsset,
+  friendAsset: page.friendAsset,
+  objectAsset: page.objectAsset,
+  emotionEmoji: page.emotionEmoji,
+),
                   ),
                 ),
 
@@ -397,8 +387,7 @@ Future<void> _speakCurrentPage(Story story, StoryPage page) async {
                 Row(
                   children: [
                     IconButton(
-                      onPressed:
-                          _pageIndex > 0 ? () => _setPage(_pageIndex - 1) : null,
+                      onPressed: _pageIndex > 0 ? () => _setPage(_pageIndex - 1) : null,
                       icon: const Icon(Icons.chevron_left),
                     ),
                     Expanded(
@@ -414,6 +403,17 @@ Future<void> _speakCurrentPage(Story story, StoryPage page) async {
                     ),
                   ],
                 ),
+
+                if (_isPlayingAudio || _isSpeakingTts) ...[
+                  const SizedBox(height: AppSpacing.small),
+                  Row(
+                    children: const [
+                      Icon(Icons.graphic_eq, size: 18),
+                      SizedBox(width: 8),
+                      Text('Reading aloud…'),
+                    ],
+                  ),
+                ],
               ],
             ),
           );
@@ -422,4 +422,3 @@ Future<void> _speakCurrentPage(Story story, StoryPage page) async {
     );
   }
 }
-

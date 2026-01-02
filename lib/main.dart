@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:suzyapp/repositories/adventure_template_repository.dart';
+import 'package:suzyapp/screens/create_adventure_screen.dart';
 import 'firebase_options.dart';
 
 import 'design_system/app_theme.dart';
@@ -17,6 +19,8 @@ import 'screens/firebase_test_screen.dart';
 import 'screens/story_completion_screen.dart';
 import 'screens/parent_gate_screen.dart';
 import 'screens/parent_summary_screen.dart';
+import 'repositories/asset_adventure_template_repository.dart';
+import 'screens/create_adventure_screen.dart';
 
 
 Future<void> main() async {
@@ -39,6 +43,7 @@ class SuzyApp extends StatelessWidget {
     required this.progressRepository,
   });
 
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -46,12 +51,17 @@ class SuzyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       routes: {
-        '/parents': (_) => const ParentGateScreen(),
-'/parent-summary': (_) => ParentSummaryScreen(progressRepository: progressRepository),
-        '/': (_) => HomeScreen(
-              storyRepository: storyRepository,
-              progressRepository: progressRepository,
-            ),
+        
+'/': (_) => HomeScreen(
+      storyRepository: storyRepository,
+      progressRepository: progressRepository,
+),
+    '/create': (_) => CreateAdventureScreen(
+          templateRepository: AssetAdventureTemplateRepository(),
+          progressRepository: progressRepository,
+        ),
+    '/parent-summary': (_) =>
+        ParentSummaryScreen(progressRepository: progressRepository),
        '/library': (_) => StoryLibraryScreen(
   storyRepository: storyRepository,
   progressRepository: progressRepository,

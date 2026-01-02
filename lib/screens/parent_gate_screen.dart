@@ -1,59 +1,50 @@
-import 'dart:math';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../design_system/app_colors.dart';
 import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
 
 class ParentGateScreen extends StatefulWidget {
-  const ParentGateScreen({super.key});
+  final VoidCallback onUnlocked;
+
+  const ParentGateScreen({super.key, required this.onUnlocked});
 
   @override
   State<ParentGateScreen> createState() => _ParentGateScreenState();
 }
 
 class _ParentGateScreenState extends State<ParentGateScreen> {
-  final _controller = TextEditingController();
-  final _rand = Random();
+  static const _holdDuration = Duration(seconds: 2);
+  Timer? _timer;
+  double _progress = 0;
 
-  late int a;
-  late int b;
+  void _startHold() {
+    _timer?.cancel();
+    final start = DateTime.now();
 
-  String? _error;
+    _timer = Timer.periodic(const Duration(milliseconds: 50), (t) {
+      final elapsed = DateTime.now().difference(start);
+      final p = elapsed.inMilliseconds / _holdDuration.inMilliseconds;
 
-  @override
-  void initState() {
-    super.initState();
-    _regen();
+      if (!mounted) return;
+      setState(() => _progress = p.clamp(0, 1).toDouble());
+
+      if (elapsed >= _holdDuration) {
+        t.cancel();
+        widget.onUnlocked();
+      }
+    });
   }
 
-  void _regen() {
-    a = 2 + _rand.nextInt(8); // 2..9
-    b = 2 + _rand.nextInt(8); // 2..9
-    _controller.clear();
-    _error = null;
-    setState(() {});
-  }
-
-  void _submit() {
-    final text = _controller.text.trim();
-    final val = int.tryParse(text);
-
-    if (val == null) {
-      setState(() => _error = 'Please enter a number.');
-      return;
-    }
-
-    if (val == a + b) {
-      Navigator.pushReplacementNamed(context, '/parent-summary');
-      return;
-    }
-
-    setState(() => _error = 'Not quite. Try again.');
+  void _cancelHold() {
+    _timer?.cancel();
+    if (!mounted) return;
+    setState(() => _progress = 0);
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _timer?.cancel();
     super.dispose();
   }
 
@@ -62,89 +53,50 @@ class _ParentGateScreenState extends State<ParentGateScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Parents'),
+        title: const Text('Parents Only'),
         backgroundColor: AppColors.background,
         elevation: 0,
       ),
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.large),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Container(
-              padding: const EdgeInsets.all(AppSpacing.large),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(AppRadius.large),
-                boxShadow: [
-                  BoxShadow(
-                    blurRadius: 14,
-                    offset: const Offset(0, 8),
-                    color: Colors.black.withOpacity(0.08),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.lock, size: 44, color: AppColors.textSecondary),
-                  const SizedBox(height: AppSpacing.medium),
-                  const Text(
-                    'Parent Check',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: AppSpacing.small),
-                  Text(
-                    'Answer this to continue:',
-                    style: TextStyle(color: AppColors.textSecondary.withOpacity(0.9)),
-                  ),
-                  const SizedBox(height: AppSpacing.large),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Grown-ups only',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: AppSpacing.small),
+            const Text(
+              'Press and hold the button for 2 seconds to continue.',
+              style: TextStyle(fontSize: 16, height: 1.3),
+            ),
+            const SizedBox(height: AppSpacing.large),
 
-                  Text(
-                    '$a + $b = ?',
-                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: AppSpacing.medium),
-
-                  TextField(
-                    controller: _controller,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      hintText: 'Enter answer',
-                      filled: true,
-                      fillColor: AppColors.background,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.large),
-                        borderSide: BorderSide.none,
-                      ),
-                      errorText: _error,
+            GestureDetector(
+              onTapDown: (_) => _startHold(),
+              onTapCancel: _cancelHold,
+              onTapUp: (_) => _cancelHold(),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.large),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(AppRadius.large),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Press & Hold',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                     ),
-                    onSubmitted: (_) => _submit(),
-                  ),
-
-                  const SizedBox(height: AppSpacing.large),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _regen,
-                          child: const Text('New Question'),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.medium),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _submit,
-                          child: const Text('Continue'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                    const SizedBox(height: AppSpacing.medium),
+                    LinearProgressIndicator(value: _progress),
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );

@@ -24,6 +24,12 @@ class StoryPage {
   final String? audioUrl;
 final String? audioAsset;
 
+final String? backgroundAsset;
+final String? heroAsset;
+final String? friendAsset;
+final String? objectAsset;
+final String? emotionEmoji;
+
   StoryPage({
     required this.index,
   required this.text,
@@ -32,6 +38,11 @@ final String? audioAsset;
   this.audioUrl,
   this.audioAsset,
   this.choices = const [],
+  this.backgroundAsset,
+  this.emotionEmoji,
+  this.friendAsset,
+  this.heroAsset,
+  this.objectAsset
   });
 
   bool get hasChoices => choices.isNotEmpty;

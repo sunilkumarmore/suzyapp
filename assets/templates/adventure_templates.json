@@ -1,0 +1,45 @@
+{
+  "templates": [
+    {
+      "id": "tpl_my_first_adventure",
+      "title": "My Little Adventure",
+      "ageBand": "2-3",
+      "slots": ["hero", "place", "friend", "object", "feeling"],
+      "choices": {
+        "hero": [
+          { "id": "bear", "label": "Bear", "emoji": "🐻" },
+          { "id": "lion", "label": "Lion", "emoji": "🦁" },
+          { "id": "bunny", "label": "Bunny", "emoji": "🐰" }
+        ],
+        "place": [
+          { "id": "park", "label": "Park", "emoji": "🏞️" },
+          { "id": "beach", "label": "Beach", "emoji": "🏖️" },
+          { "id": "home", "label": "Home", "emoji": "🏠" }
+        ],
+        "friend": [
+          { "id": "turtle", "label": "Turtle", "emoji": "🐢" },
+          { "id": "duck", "label": "Duck", "emoji": "🦆" },
+          { "id": "cat", "label": "Cat", "emoji": "🐱" }
+        ],
+        "object": [
+          { "id": "ball", "label": "Ball", "emoji": "⚽" },
+          { "id": "star", "label": "Star", "emoji": "⭐" },
+          { "id": "hat", "label": "Hat", "emoji": "🎩" }
+        ],
+        "feeling": [
+          { "id": "happy", "label": "Happy", "emoji": "😊" },
+          { "id": "brave", "label": "Brave", "emoji": "💪" },
+          { "id": "proud", "label": "Proud", "emoji": "🌟" }
+        ]
+      },
+      "pages": [
+        { "text": "{hero} went to the {place}." },
+        { "text": "There, {hero} met a {friend}." },
+        { "text": "They found a {object} on the ground." },
+        { "text": "{hero} felt very {feeling}." },
+        { "text": "They played together and had fun." },
+        { "text": "The end. Great job, {hero}!" }
+      ]
+    }
+  ]
+}
