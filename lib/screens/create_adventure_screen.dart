@@ -91,8 +91,7 @@ class _CreateAdventureScreenState extends State<CreateAdventureScreen> {
           storyRepository: repo,
           progressRepository: widget.progressRepository,
           storyId: story.id,
-          startPageIndex: 0,
-        ),
+          startPageIndex: 0,  ),
       ),
     );
   }

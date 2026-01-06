@@ -7,43 +7,53 @@
   "pages": [
     {
       "text": "In the classroom, the teacher calls names.\n\"Ello Elephant,\" she says.\nEllo raises his trunk and smiles.",
-      "imageAsset": "assets/images/lunchbox_01_rollcall.png"
+      "imageAsset": "assets/images/lunchbox_01_rollcall.png",
+      "audioUrl": null
     },
     {
       "text": "At lunchtime, Ello opens his backpack.\nHis lunchbox is not there.\nEllo looks surprised.",
-      "imageAsset": "assets/images/lunchbox_02_missing.png"
+      "imageAsset": "assets/images/lunchbox_02_missing.png",
+      "audioUrl": null
     },
     {
       "text": "Ello checks his desk and his chair.\nHe looks carefully.\nStill no lunchbox.",
-      "imageAsset": "assets/images/lunchbox_03_desk.png"
+      "imageAsset": "assets/images/lunchbox_03_desk.png",
+      "audioUrl": null
     },
     {
       "text": "Fox, Rabbit, and Bear come to help.\n\"Let’s find it,\" says Fox.\nThey all start looking together.",
-      "imageAsset": "assets/images/lunchbox_04_friends.png"
+      "imageAsset": "assets/images/lunchbox_04_friends.png",
+      "audioUrl": null
     },
     {
       "text": "Fox says, \"Maybe it’s in the cubbies.\"\nThey check every cubby.\nThe lunchbox is not there.",
-      "imageAsset": "assets/images/lunchbox_05_cubbies.png"
+      "imageAsset": "assets/images/lunchbox_05_cubbies.png",
+      "audioUrl": null
     },
     {
       "text": "Rabbit says, \"Maybe you left it by the door.\"\nThey look near the classroom door.\nStill no lunchbox.",
-      "imageAsset": "assets/images/lunchbox_06_door.png"
+      "imageAsset": "assets/images/lunchbox_06_door.png",
+      "audioUrl": null
     },
     {
       "text": "Ello looks at the lunch table.\nHis name card is there.\nBut his lunchbox is missing.",
-      "imageAsset": "assets/images/lunchbox_07_clue.png"
+      "imageAsset": "assets/images/lunchbox_07_clue.png",
+      "audioUrl": null
     },
     {
       "text": "Bear says, \"What did we do before lunch?\"\nEllo thinks about the morning.\n\"We had art time,\" he says.",
-      "imageAsset": "assets/images/lunchbox_08_thinking.png"
+      "imageAsset": "assets/images/lunchbox_08_thinking.png",
+      "audioUrl": null
     },
     {
       "text": "They walk to the art corner.\nOn the shelf, Ello sees it.\nHis lunchbox is there.",
-      "imageAsset": "assets/images/lunchbox_09_found.png"
+      "imageAsset": "assets/images/lunchbox_09_found.png",
+      "audioUrl": null
     },
     {
       "text": "Ello laughs.\n\"I forgot it,\" he says.\nThinking step by step helped.",
-      "imageAsset": "assets/images/lunchbox_10_reflection.png"
+      "imageAsset": "assets/images/lunchbox_10_reflection.png",
+      "audioUrl": null
     }
   ],
   "completedMessage": "🧠 When something is missing, slow down and think step by step."

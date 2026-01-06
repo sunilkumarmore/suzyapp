@@ -1,8 +1,16 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:suzyapp/Services/parent_voice_service.dart';
+import 'package:suzyapp/Services/voice_backend_client.dart';
+import 'package:suzyapp/models/parent_voice_audio.dart';
+import 'package:suzyapp/repositories/parent_voice_audio_repository.dart';
+import 'package:suzyapp/repositories/parent_voice_repository.dart';
+import 'package:suzyapp/repositories/parent_voice_settings_repository.dart';
 
 import '../design_system/app_colors.dart';
 import '../design_system/app_radius.dart';
@@ -20,6 +28,10 @@ class StoryReaderScreen extends StatefulWidget {
   final ProgressRepository progressRepository;
   final String storyId;
   final int? startPageIndex;
+//   final ParentVoiceRepository parentVoiceRepository;
+// final ParentVoiceAudioRepository parentVoiceAudioRepository;
+// final VoiceBackendClient voiceBackendClient;
+// final String uid; // from Firebase Auth
 
   const StoryReaderScreen({
     super.key,
@@ -27,6 +39,10 @@ class StoryReaderScreen extends StatefulWidget {
     required this.progressRepository,
     required this.storyId,
     this.startPageIndex,
+    // required this.parentVoiceRepository,
+    // required this.parentVoiceAudioRepository,
+    // required this.uid,
+    // required this.voiceBackendClient,
   });
 
   @override
@@ -36,6 +52,12 @@ class StoryReaderScreen extends StatefulWidget {
 class _StoryReaderScreenState extends State<StoryReaderScreen> {
   late Future<Story> _future;
   Story? _storyCache;
+
+  late final ParentVoiceService _parentVoiceService;
+late final FirebaseParentVoiceSettingsRepository _voiceSettingsRepo;
+
+bool _parentVoiceEnabled = false;
+String? _parentVoiceId;
 
   int _pageIndex = 0;
   bool _completionShown = false;
@@ -51,6 +73,15 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
   @override
   void initState() {
     super.initState();
+
+  _pageIndex = widget.startPageIndex ?? 0;
+  _future = widget.storyRepository.getStoryById(widget.storyId);
+  
+  _loadParentVoiceSettings(); // ✅ ADD HERE
+    _parentVoiceService = ParentVoiceService(
+  speakEndpoint: 'https://us-central1-suzyapp.cloudfunctions.net/parentVoiceSpeak',
+);
+_voiceSettingsRepo = FirebaseParentVoiceSettingsRepository();
 
     _pageIndex = widget.startPageIndex ?? 0;
     _future = widget.storyRepository.getStoryById(widget.storyId);
@@ -79,6 +110,55 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
     _player.dispose();
     super.dispose();
   }
+
+  Future<void> _loadParentVoiceSettings() async {
+
+  final user = FirebaseAuth.instance.currentUser;
+  debugPrint('AUTH user = $user');
+debugPrint('AUTH uid = ${user?.uid}');
+debugPrint('AUTH email = ${user?.email}');
+  if (user == null) return;
+
+  final doc = await FirebaseFirestore.instance
+      .doc('users/${user.uid}/settings/audio')
+      .get();
+  final path = "users/${user.uid}/settings/audio"; 
+  debugPrint('FIRESTORE PATH = $path');
+  debugPrint('RAW parentVoiceEnabled = ${doc.data()?['parentVoiceEnabled']} '
+    'type=${doc.data()?['parentVoiceEnabled']?.runtimeType}');
+debugPrint('RAW elevenVoiceId = ${doc.data()?['elevenVoiceId']}');
+
+  final settingsCollection = FirebaseFirestore.instance
+    .collection('users')
+    .doc(user.uid)
+    .collection('settings');
+
+final settingsSnap = await settingsCollection.get();
+debugPrint('SETTINGS COLLECTION DOC COUNT = ${settingsSnap.docs.length}');
+for (final d in settingsSnap.docs) {
+  debugPrint('SETTINGS DOC ID = ${d.id}, DATA = ${d.data()}');
+}
+
+  if (!mounted) return;
+
+  if (!doc.exists) {
+    setState(() {
+      _parentVoiceEnabled = false;
+      _parentVoiceId = null;
+       debugPrint('INSIDE setState: enabled=$_parentVoiceEnabled voiceId=$_parentVoiceId');
+    });
+    return;
+  }
+
+  final data = doc.data()!;
+  setState(() {
+    _parentVoiceEnabled = data['parentVoiceEnabled'] == true;
+    _parentVoiceId = data['elevenVoiceId'] as String?;
+  });
+
+
+  }
+
 
   // ---------- Audio helpers ----------
 
@@ -117,6 +197,40 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
       }
     }
 
+debugPrint('BEFORE ParentAI block: enabled=$_parentVoiceEnabled voiceId=$_parentVoiceId');
+    // 1) page.audioUrl first (already in your code)
+
+// 2) Parent AI voice (server cached/generated)
+debugPrint('🧠 ParentAI: enabled=$_parentVoiceEnabled voiceId=$_parentVoiceId');
+// _parentVoiceEnabled= true;
+// _parentVoiceId="nzFihrBIvB34imQBuxub";
+//hardcoding for test
+if (_parentVoiceEnabled && _parentVoiceId != null && _parentVoiceId!.isNotEmpty) {
+  final generatedUrl = await _parentVoiceService.getOrCreatePageAudioUrl(
+    voiceId: _parentVoiceId!,
+    storyId: story.id,
+    pageIndex: page.index,
+    lang: story.language,
+    text: page.text,
+  );
+debugPrint('🧠 ParentAI: generatedUrl=$generatedUrl');
+  if (generatedUrl != null && generatedUrl.isNotEmpty) {
+    try {
+      if (kIsWeb) {
+        await _player.setUrl(generatedUrl);
+      } else {
+        final file = await DefaultCacheManager().getSingleFile(generatedUrl);
+        await _player.setFilePath(file.path);
+      }
+      await _player.play();
+      return;
+    } catch (e, st) {
+      debugPrint('🧠 ParentAI play error: $e');
+  debugPrint('$st');
+      // fall through to asset/TTS
+    }
+  }
+}
     // 2) Asset second (offline pack)
     final asset = page.audioAsset;
     if (asset != null && asset.trim().isNotEmpty) {
