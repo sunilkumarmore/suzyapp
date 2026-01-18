@@ -63,6 +63,8 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
   bool _isReadAloudBusy = false;
   bool _parentVoiceDegraded = false; // once true, skip parent voice for this session
 
+  bool _swipeHintSeen = false; // show hint only once per install/session
+
   final AudioPlayer _player = AudioPlayer();
   final FlutterTts _tts = FlutterTts();
 
@@ -95,6 +97,8 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
     _tts.setSpeechRate(0.45);
     _tts.setPitch(1.05);
     _tts.setVolume(1.0);
+
+    _autoDismissSwipeHint();
   }
 
   @override
@@ -364,6 +368,100 @@ unawaited(_saveStoryProgress());
     }
   }
 
+  void _markSwiped() {
+    if (_swipeHintSeen) return;
+    setState(() => _swipeHintSeen = true);
+  }
+
+  void _autoDismissSwipeHint() {
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      if (_swipeHintSeen) return;
+      setState(() => _swipeHintSeen = true);
+    });
+  }
+
+  Widget _SwipeHintOverlay({required bool show}) {
+    if (!show) return const SizedBox.shrink();
+
+    return IgnorePointer(
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Padding(
+          padding: const EdgeInsets.only(right: 10),
+          child: AnimatedOpacity(
+            opacity: show ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 250),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.28),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Swipe',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                  ),
+                  SizedBox(width: 6),
+                  Icon(Icons.chevron_right, color: Colors.white, size: 20),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _ProgressRow({required int index, required int total}) {
+    final pageNum = index + 1;
+    final value = total == 0 ? 0.0 : pageNum / total;
+
+    return Row(
+      children: [
+        IconButton(
+          onPressed: index > 0 ? () {
+            _markSwiped();
+            _setPage(index - 1);
+          } : null,
+          icon: const Icon(Icons.chevron_left),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              LinearProgressIndicator(
+                value: value,
+                minHeight: 6,
+                backgroundColor: AppColors.outline.withOpacity(0.35),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Page $pageNum of $total',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary.withOpacity(0.85),
+                ),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          onPressed: index < total - 1 ? () {
+            _markSwiped();
+            _setPage(index + 1);
+          } : null,
+          icon: const Icon(Icons.chevron_right),
+        ),
+      ],
+    );
+  }
+
   // ---------- Layout helpers ----------
 
   int _imageFlexFor(String ageBand, String text) {
@@ -441,110 +539,119 @@ unawaited(_saveStoryProgress());
           final imageFlex = _imageFlexFor(story.ageBand, page.text);
           final textFlex = 10 - imageFlex;
 
-          return Padding(
-            padding: const EdgeInsets.all(AppSpacing.large),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  story.title,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: AppSpacing.medium),
+          return GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragEnd: (details) {
+              final vx = details.primaryVelocity ?? 0;
 
-                Expanded(
-                  flex: imageFlex,
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(AppRadius.large),
-                    ),
-                    child: AdventureScene(
-                      backgroundAsset: AssetPath.normalize(page.backgroundAsset ?? page.imageAsset),
-                      heroAsset: AssetPath.normalize(page.heroAsset),
-                      friendAsset: AssetPath.normalize(page.friendAsset),
-                      objectAsset: AssetPath.normalize(page.objectAsset),
-                      emotionEmoji: page.emotionEmoji,
-                    ),
-                  ),
-                ),
+              if (vx < -250) {
+                _markSwiped();
+                if (_pageIndex < story.pages.length - 1) {
+                  _setPage(_pageIndex + 1);
+                } else {
+                  _showCompletion(story);
+                }
+              }
 
-                const SizedBox(height: AppSpacing.medium),
+              if (vx > 250) {
+                _markSwiped();
+                if (_pageIndex > 0) {
+                  _setPage(_pageIndex - 1);
+                }
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.large),
+              child: Stack(
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        story.title,
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: AppSpacing.medium),
 
-                Expanded(
-                  flex: textFlex,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(AppSpacing.large),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(AppRadius.large),
-                    ),
-                    child: SingleChildScrollView(
-                      child: Text(
-                        page.text,
-                        style: TextStyle(
-                          fontSize: story.ageBand == '2-3' ? 18 : 20,
-                          height: 1.25,
+                      Expanded(
+                        flex: imageFlex,
+                        child: Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(AppRadius.large),
+                          ),
+                          child: AdventureScene(
+                            backgroundAsset: AssetPath.normalize(page.backgroundAsset ?? page.imageAsset),
+                            heroAsset: AssetPath.normalize(page.heroAsset),
+                            friendAsset: AssetPath.normalize(page.friendAsset),
+                            objectAsset: AssetPath.normalize(page.objectAsset),
+                            emotionEmoji: page.emotionEmoji,
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
 
-                const SizedBox(height: AppSpacing.medium),
+                      const SizedBox(height: AppSpacing.medium),
 
-                if (page.hasChoices) ...[
-                  const Text(
-                    'What should happen next?',
-                    style: TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: AppSpacing.small),
-                  Wrap(
-                    spacing: AppSpacing.small,
-                    runSpacing: AppSpacing.small,
-                    children: page.choices.map((c) {
-                      return ElevatedButton(
-                        onPressed: () => _setPage(c.nextPageIndex),
-                        child: Text(c.label),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: AppSpacing.small),
-                ],
-
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: _pageIndex > 0 ? () => _setPage(_pageIndex - 1) : null,
-                      icon: const Icon(Icons.chevron_left),
-                    ),
-                    Expanded(
-                      child: LinearProgressIndicator(
-                        value: (_pageIndex + 1) / story.pages.length,
+                      Expanded(
+                        flex: textFlex,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(AppSpacing.large),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(AppRadius.large),
+                          ),
+                          child: SingleChildScrollView(
+                            child: Text(
+                              page.text,
+                              style: TextStyle(
+                                fontSize: story.ageBand == '2-3' ? 18 : 20,
+                                height: 1.25,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      onPressed: _pageIndex < story.pages.length - 1
-                          ? () => _setPage(_pageIndex + 1)
-                          : () => _showCompletion(story),
-                      icon: const Icon(Icons.chevron_right),
-                    ),
-                  ],
-                ),
 
-                if (_isPlayingAudio || _isSpeakingTts) ...[
-                  const SizedBox(height: AppSpacing.small),
-                  Row(
-                    children: const [
-                      Icon(Icons.graphic_eq, size: 18),
-                      SizedBox(width: 8),
-                      Text('Reading aloud…'),
+                      const SizedBox(height: AppSpacing.medium),
+
+                      if (page.hasChoices) ...[
+                        const Text(
+                          'What should happen next?',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: AppSpacing.small),
+                        Wrap(
+                          spacing: AppSpacing.small,
+                          runSpacing: AppSpacing.small,
+                          children: page.choices.map((c) {
+                            return ElevatedButton(
+                              onPressed: () => _setPage(c.nextPageIndex),
+                              child: Text(c.label),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: AppSpacing.small),
+                      ],
+
+                      _ProgressRow(index: _pageIndex, total: story.pages.length),
+
+                      if (_isPlayingAudio || _isSpeakingTts) ...[
+                        const SizedBox(height: AppSpacing.small),
+                        Row(
+                          children: const [
+                            Icon(Icons.graphic_eq, size: 18),
+                            SizedBox(width: 8),
+                            Text('Reading aloud…'),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
+                  _SwipeHintOverlay(show: !_swipeHintSeen && _pageIndex == 0),
                 ],
-              ],
+              ),
             ),
           );
         },

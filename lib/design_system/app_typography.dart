@@ -23,4 +23,11 @@ class AppTypography {
     color: AppColors.textPrimary,
   );
 
+  static final headingSubtitle = GoogleFonts.fredoka(
+    fontSize: 18,
+    fontWeight: FontWeight.w500,
+    height: 1.2,
+    color: AppColors.textPrimary.withOpacity(0.7),
+  );
+
 }

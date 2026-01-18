@@ -143,7 +143,7 @@ class _StoryLibraryScreenState extends State<StoryLibraryScreen> {
                       crossAxisCount: cols,
                       crossAxisSpacing: AppSpacing.medium,
                       mainAxisSpacing: AppSpacing.medium,
-                      childAspectRatio: 1.05,
+                      childAspectRatio: 0.72,
                     ),
                     itemBuilder: (context, i) {
                       final s = stories[i];
@@ -445,45 +445,36 @@ class _StoryCard extends StatelessWidget {
 
             // Bottom: compact metadata area
             Expanded(
-              flex: 3,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.xsmall,
-                  AppSpacing.xsmall,
-                  AppSpacing.xsmall,
-                  AppSpacing.xsmall,
-                ),
+                padding: const EdgeInsets.all(AppSpacing.medium),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       story.title,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
-                        height: 1.05,
+                        height: 1.15,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.xsmall),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        children: [
-                          _Badge(text: story.ageBand, color: accent),
-                          const SizedBox(width: AppSpacing.xsmall),
-                          _Badge(
-                            text: story.language.toUpperCase(),
-                            color: AppColors.textSecondary,
-                            fill: AppColors.textSecondary.withOpacity(0.12),
-                          ),
-                        ],
-                      ),
+                    const SizedBox(height: AppSpacing.small),
+                    Wrap(
+                      spacing: AppSpacing.small,
+                      runSpacing: AppSpacing.small,
+                      children: [
+                        _Badge(text: story.ageBand, color: accent),
+                        _Badge(
+                          text: story.language.toUpperCase(),
+                          color: AppColors.textSecondary,
+                          fill: AppColors.textSecondary.withOpacity(0.12),
+                        ),
+                      ],
                     ),
+                    const Spacer(),
                   ],
                 ),
               ),
