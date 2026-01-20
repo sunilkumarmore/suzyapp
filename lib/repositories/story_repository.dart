@@ -1,5 +1,7 @@
 import '../models/story.dart';
 
+const kMakeAStoryDemoId = 'demo_make_story';
+
 class StoryQuery {
   final String searchText;
   final String? language; // 'en'|'te'|'mixed'

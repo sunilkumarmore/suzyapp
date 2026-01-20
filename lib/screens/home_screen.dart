@@ -113,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: AppSpacing.medium),
 
-              if (_progress != null) ...[
+              if (_progress != null && _progress!.storyId != kMakeAStoryDemoId) ...[
                 _BigTile(
                   title: 'Continue',
                   subtitle: '',

@@ -75,7 +75,53 @@ String normAge(String s) => norm(s).replaceAll('–', '-'); // en-dash → hyphe
 
   @override
   Future<Story> getStoryById(String id) async {
+    if (id == kMakeAStoryDemoId) {
+      return _demoMakeAStory();
+    }
     final stories = await _ensureLoaded();
     return stories.firstWhere((s) => s.id == id);
+  }
+
+  Story _demoMakeAStory() {
+    return Story(
+      id: kMakeAStoryDemoId,
+      title: 'Make a Story',
+      language: 'en',
+      ageBand: '4-5',
+      coverAsset: null,
+      pages: [
+        StoryPage(
+          index: 0,
+          text: 'Let us make a story! Who should be the hero?',
+          choices: [
+            StoryChoice(id: 'hero_bunny', label: 'A brave bunny', nextPageIndex: 1),
+            StoryChoice(id: 'hero_bear', label: 'A curious bear', nextPageIndex: 2),
+          ],
+        ),
+        StoryPage(
+          index: 1,
+          text: 'Great! The bunny loves adventures. Where should we go?',
+          choices: [
+            StoryChoice(id: 'place_forest', label: 'To the forest', nextPageIndex: 3),
+            StoryChoice(id: 'place_beach', label: 'To the beach', nextPageIndex: 3),
+          ],
+        ),
+        StoryPage(
+          index: 2,
+          text: 'Awesome! The bear is ready. What do we find first?',
+          choices: [
+            StoryChoice(id: 'find_treasure', label: 'A hidden treasure', nextPageIndex: 3),
+            StoryChoice(id: 'find_friend', label: 'A new friend', nextPageIndex: 3),
+          ],
+        ),
+        StoryPage(
+          index: 3,
+          text: 'Your story is coming to life. Want to make another choice?',
+          choices: [
+            StoryChoice(id: 'again_yes', label: 'Yes, keep going', nextPageIndex: 0),
+          ],
+        ),
+      ],
+    );
   }
 }

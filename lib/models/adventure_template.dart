@@ -84,10 +84,44 @@ class AdventureChoice {
 
 class AdventurePageTemplate {
   final String text;
+  final List<AdventurePageChoice> choices;
 
-  AdventurePageTemplate({required this.text});
+  AdventurePageTemplate({
+    required this.text,
+    this.choices = const [],
+  });
+
+  bool get hasChoices => choices.isNotEmpty;
 
   factory AdventurePageTemplate.fromJson(Map<String, dynamic> json) {
-    return AdventurePageTemplate(text: json['text'] as String? ?? '');
-    }
+    return AdventurePageTemplate(
+      text: json['text'] as String? ?? '',
+      choices: (json['choices'] as List? ?? const [])
+          .map((e) => AdventurePageChoice.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class AdventurePageChoice {
+  final String id;
+  final String label;
+  final int nextPageIndex;
+  final String? imageAsset;
+
+  AdventurePageChoice({
+    required this.id,
+    required this.label,
+    required this.nextPageIndex,
+    this.imageAsset,
+  });
+
+  factory AdventurePageChoice.fromJson(Map<String, dynamic> json) {
+    return AdventurePageChoice(
+      id: json['id'] as String,
+      label: json['label'] as String? ?? '',
+      nextPageIndex: (json['nextPageIndex'] as num?)?.toInt() ?? 0,
+      imageAsset: json['imageAsset'] as String?,
+    );
+  }
 }

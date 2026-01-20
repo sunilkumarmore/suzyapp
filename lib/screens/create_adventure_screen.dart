@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:suzyapp/models/adventure_template.dart';
 import 'package:suzyapp/utils/asset_path.dart';
+
 import '../design_system/app_colors.dart';
 import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
@@ -8,7 +9,7 @@ import '../models/story.dart';
 import '../repositories/adventure_template_repository.dart';
 import '../repositories/story_repository.dart';
 import '../repositories/progress_repository.dart';
-import 'parent_gate_screen.dart';
+import '../widgets/choice_tile.dart';
 import 'story_reader_screen.dart';
 
 class CreateAdventureScreen extends StatefulWidget {
@@ -26,12 +27,20 @@ class CreateAdventureScreen extends StatefulWidget {
 }
 
 class _CreateAdventureScreenState extends State<CreateAdventureScreen> {
-  bool _unlocked = false;
   late Future<List<AdventureTemplate>> _future;
 
   AdventureTemplate? _template;
+
+  @Deprecated('Unused in picker flow')
   int _slotIndex = 0;
+  @Deprecated('Unused in picker flow')
   final Map<String, AdventureChoice> _selected = {};
+
+  bool _locked = false;
+  @Deprecated('Unused in picker flow')
+  int? _selectedIndex;
+  @Deprecated('Unused in picker flow')
+  int? _sparkleIndex;
 
   @override
   void initState() {
@@ -39,11 +48,42 @@ class _CreateAdventureScreenState extends State<CreateAdventureScreen> {
     _future = widget.templateRepository.loadTemplates();
   }
 
+  // ---- SLOT ORDER (place first, then hero, etc.) ----
+  static const List<String> _preferredSlotOrder = [
+    'place',
+    'hero',
+    'friend',
+    'object',
+    'feeling',
+  ];
+
+  @Deprecated('Unused in picker flow')
+  List<String> _orderedSlots(AdventureTemplate t) {
+    final slots = List<String>.from(t.slots);
+
+    // Keep only those that exist, in preferred order.
+    final ordered = <String>[];
+    for (final s in _preferredSlotOrder) {
+      if (slots.contains(s)) ordered.add(s);
+    }
+
+    // Append any unknown/custom slots at the end (preserve template order).
+    for (final s in slots) {
+      if (!ordered.contains(s)) ordered.add(s);
+    }
+
+    return ordered;
+  }
+
+  @Deprecated('Unused in picker flow')
   void _resetFlow(AdventureTemplate t) {
     setState(() {
       _template = t;
       _slotIndex = 0;
       _selected.clear();
+      _locked = false;
+      _selectedIndex = null;
+      _sparkleIndex = null;
     });
   }
 
@@ -55,8 +95,11 @@ class _CreateAdventureScreenState extends State<CreateAdventureScreen> {
   }
 
   String _render(String templateText) {
+    final t = _template;
+    if (t == null) return templateText;
+
     var out = templateText;
-    for (final slot in _template!.slots) {
+    for (final slot in t.slots) {
       out = out.replaceAll('{${slot}}', _tokenValue(slot));
     }
     return out;
@@ -64,12 +107,23 @@ class _CreateAdventureScreenState extends State<CreateAdventureScreen> {
 
   Story _buildCreatedStory(AdventureTemplate t) {
     final pages = <StoryPage>[];
+
     for (var i = 0; i < t.pages.length; i++) {
-      pages.add(StoryPage(
-        index: i,
-        text: _render(t.pages[i].text),
-        choices: const [],
-      ));
+      final pt = t.pages[i];
+      pages.add(
+        StoryPage(
+          index: i,
+          text: _render(pt.text),
+          choices: pt.choices
+              .map((c) => StoryChoice(
+                    id: c.id,
+                    label: c.label,
+                    nextPageIndex: c.nextPageIndex,
+                    imageAsset: c.imageAsset,
+                  ))
+              .toList(),
+        ),
+      );
     }
 
     return Story(
@@ -78,7 +132,7 @@ class _CreateAdventureScreenState extends State<CreateAdventureScreen> {
       language: 'en',
       ageBand: t.ageBand,
       pages: pages,
-      coverAsset: t.coverAsset
+      coverAsset: t.coverAsset,
     );
   }
 
@@ -93,17 +147,103 @@ class _CreateAdventureScreenState extends State<CreateAdventureScreen> {
           storyRepository: repo,
           progressRepository: widget.progressRepository,
           storyId: story.id,
-          startPageIndex: 0,  ),
+          startPageIndex: 0,
+        ),
+      ),
+    );
+  }
+
+  @Deprecated('Unused in picker flow')
+  Future<void> _onPickOption(AdventureChoice option) async {
+    if (_locked) return;
+    final t = _template;
+    if (t == null) return;
+
+    final slots = _orderedSlots(t);
+    final currentSlot = slots[_slotIndex];
+
+    setState(() => _selected[currentSlot] = option);
+
+    if (_slotIndex < slots.length - 1) {
+      setState(() {
+        _slotIndex++;
+        _selectedIndex = null;
+      });
+    } else {
+      final story = _buildCreatedStory(t);
+      _openReader(story);
+    }
+  }
+
+  @Deprecated('Unused in picker flow')
+  String _slotTitle(String slot) {
+    switch (slot) {
+      case 'place':
+        return 'Pick a place';
+      case 'hero':
+        return 'Pick a hero';
+      case 'friend':
+        return 'Pick a friend';
+      case 'object':
+        return 'Pick a thing';
+      case 'feeling':
+        return 'Pick a feeling';
+      default:
+        return 'Pick one';
+    }
+  }
+
+  // Big preview image at top:
+  // - If user already picked something for current slot, preview that
+  // - Else preview template cover (if any)
+  // - Else show a soft placeholder
+  @Deprecated('Unused in picker flow')
+  Widget _buildScenePreview({
+    required AdventureTemplate t,
+    required String currentSlot,
+  }) {
+    final picked = _selected[currentSlot];
+    final pickedImg = AssetPath.normalize(picked?.imageAsset);
+    final cover = AssetPath.normalize(t.coverAsset);
+
+    final previewAsset = pickedImg.isNotEmpty ? pickedImg : cover;
+
+    return AspectRatio(
+      aspectRatio: 16 / 10,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.large),
+        child: Container(
+          color: AppColors.surface,
+          child: previewAsset.isNotEmpty
+              ? Image.asset(
+                  previewAsset,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _previewPlaceholder(),
+                )
+              : _previewPlaceholder(),
+        ),
+      ),
+    );
+  }
+
+  @Deprecated('Unused in picker flow')
+  Widget _previewPlaceholder() {
+    return Container(
+      color: AppColors.surface,
+      child: Center(
+        child: Text(
+          'Scene preview',
+          style: TextStyle(
+            color: AppColors.textSecondary.withOpacity(0.8),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_unlocked) {
-      return ParentGateScreen(onUnlocked: () => setState(() => _unlocked = true));
-    }
-
     return FutureBuilder<List<AdventureTemplate>>(
       future: _future,
       builder: (context, snap) {
@@ -121,182 +261,25 @@ class _CreateAdventureScreenState extends State<CreateAdventureScreen> {
           return const Scaffold(body: Center(child: Text('No templates found.')));
         }
 
-        // Pick first template (v1). Later we can add a template picker UI.
-        _template ??= templates.first;
-        final t = _template!;
+        if (_template == null) {
+          return _AdventurePicker(
+            templates: templates,
+            onPick: (t) async {
+              setState(() => _template = t);
 
-        final slots = t.slots;
-        final currentSlot = slots[_slotIndex];
-        final options = t.choices[currentSlot] ?? const <AdventureChoice>[];
+              final story = _buildCreatedStory(t);
+              await _openReader(story);
 
-        return Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(
-            title: const Text('Create a Story'),
-            backgroundColor: AppColors.background,
-            elevation: 0,
-            actions: [
-              TextButton(
-                onPressed: () => _resetFlow(t),
-                child: const Text('Reset'),
-              ),
-            ],
-          ),
-          body: Padding(
-            padding: const EdgeInsets.all(AppSpacing.large),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  t.title,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: AppSpacing.small),
+              if (mounted) setState(() => _template = null);
+            },
+          );
+        }
 
-                Row(
-                  children: [
-                    Text('Step ${_slotIndex + 1} of ${slots.length}',
-                        style: const TextStyle(fontWeight: FontWeight.w700)),
-                    const SizedBox(width: AppSpacing.medium),
-                    Expanded(
-                      child: LinearProgressIndicator(
-                        value: (_slotIndex + 1) / slots.length,
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: AppSpacing.large),
-
-                Text(
-                  _slotTitle(currentSlot),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: AppSpacing.medium),
-
-                Expanded(
-                  child: GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: AppSpacing.medium,
-                      crossAxisSpacing: AppSpacing.medium,
-                      childAspectRatio: 1.0,
-                    ),
-                    itemCount: options.length,
-                    itemBuilder: (context, i) {
-                      final c = options[i];
-                      final selected = _selected[currentSlot]?.id == c.id;
-                      final imageAsset = AssetPath.normalize(c.imageAsset);
-                      final choiceVisual = imageAsset.isNotEmpty
-                          ? Image.asset(
-                              imageAsset,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) {
-                                return Text(c.emoji, style: const TextStyle(fontSize: 42));
-                              },
-                            )
-                          : Text(c.emoji, style: const TextStyle(fontSize: 42));
-
-                      return InkWell(
-                        borderRadius: BorderRadius.circular(AppRadius.large),
-                        onTap: () {
-                          setState(() => _selected[currentSlot] = c);
-
-                          // auto-advance
-                          if (_slotIndex < slots.length - 1) {
-                            setState(() => _slotIndex++);
-                          } else {
-                            // done -> build story & open reader
-                            final story = _buildCreatedStory(t);
-                            _openReader(story);
-                          }
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(AppSpacing.medium),
-                          decoration: BoxDecoration(
-                            color: selected ? AppColors.surface : AppColors.surface,
-                            borderRadius: BorderRadius.circular(AppRadius.large),
-                            border: Border.all(
-                              width: selected ? 3 : 1,
-                              color: selected ? Colors.black : Colors.black12,
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(AppSpacing.medium),
-                                  child: SizedBox(
-                                    width: double.infinity,
-                                    child: AspectRatio(
-                                      aspectRatio: 1,
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(AppRadius.large - 4),
-                                        child: choiceVisual,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.small),
-                              Text(
-                                c.label,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-
-                const SizedBox(height: AppSpacing.medium),
-
-                // Back button for parents (optional)
-                Row(
-                  children: [
-                    TextButton(
-                      onPressed: _slotIndex > 0
-                          ? () => setState(() => _slotIndex--)
-                          : null,
-                      child: const Text('Back'),
-                    ),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () => _openReader(_buildCreatedStory(t)),
-                      child: const Text('Preview Now'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+        return const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
         );
       },
     );
-  }
-
-  String _slotTitle(String slot) {
-    switch (slot) {
-      case 'hero':
-        return 'Pick a hero';
-      case 'place':
-        return 'Pick a place';
-      case 'friend':
-        return 'Pick a friend';
-      case 'object':
-        return 'Pick a thing';
-      case 'feeling':
-        return 'Pick a feeling';
-      default:
-        return 'Pick one';
-    }
   }
 }
 
@@ -317,5 +300,49 @@ class _InMemoryStoryRepository implements StoryRepository {
   Future<List<Story>> listStories({required StoryQuery query}) async {
     // Created story does not show in library for v1.
     return const [];
+  }
+}
+
+class _AdventurePicker extends StatelessWidget {
+  final List<AdventureTemplate> templates;
+  final ValueChanged<AdventureTemplate> onPick;
+
+  const _AdventurePicker({required this.templates, required this.onPick});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Pick an Adventure'),
+        backgroundColor: AppColors.background,
+        elevation: 0,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(AppSpacing.large),
+        child: GridView.builder(
+          itemCount: templates.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: AppSpacing.large,
+            crossAxisSpacing: AppSpacing.large,
+            childAspectRatio: 0.75,
+          ),
+          itemBuilder: (context, i) {
+            final t = templates[i];
+            final cover = AssetPath.normalize(t.coverAsset);
+
+            return ChoiceTile(
+              label: t.title,
+              imageAsset: cover,
+              selected: false,
+              showSparkle: false,
+              disabled: false,
+              onTap: () => onPick(t),
+            );
+          },
+        ),
+      ),
+    );
   }
 }

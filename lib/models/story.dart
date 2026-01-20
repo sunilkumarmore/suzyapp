@@ -54,10 +54,21 @@ class StoryChoice {
   final String id;
   final String label;
   final int nextPageIndex;
+  final String? imageAsset;
 
   StoryChoice({
     required this.id,
     required this.label,
     required this.nextPageIndex,
+    this.imageAsset,
   });
+
+  factory StoryChoice.fromJson(Map<String, dynamic> json) {
+    return StoryChoice(
+      id: json['id'] as String? ?? '',
+      label: json['label'] as String? ?? '',
+      nextPageIndex: (json['nextPageIndex'] as num?)?.toInt() ?? 0,
+      imageAsset: json['imageAsset'] as String?,
+    );
+  }
 }
