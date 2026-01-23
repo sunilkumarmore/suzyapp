@@ -1,14 +1,17 @@
 import 'dart:math';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../design_system/app_colors.dart';
 import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
+import '../utils/asset_path.dart';
 
 class ChoiceTile extends StatelessWidget {
   final String label;
   final String? imageAsset;
+  final double? height;
   final bool selected;
   final bool showSparkle;
   final bool disabled;
@@ -18,6 +21,7 @@ class ChoiceTile extends StatelessWidget {
     super.key,
     required this.label,
     required this.imageAsset,
+    this.height,
     required this.selected,
     required this.showSparkle,
     required this.disabled,
@@ -35,7 +39,7 @@ class ChoiceTile extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadius.large),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        height: 112,
+        height: height ?? 112,
         padding: const EdgeInsets.all(AppSpacing.medium),
         decoration: BoxDecoration(
           color: bg,
@@ -84,21 +88,41 @@ class _ChoiceImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final raw = asset?.trim() ?? '';
+    final normalized = raw.isEmpty ? '' : AssetPath.normalize(raw);
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(AppRadius.large),
       ),
-      child: (asset == null || asset!.trim().isEmpty)
+      child: normalized.isEmpty
           ? const Center(child: Icon(Icons.image_outlined))
           : ClipRRect(
               borderRadius: BorderRadius.circular(AppRadius.large),
-              child: Image.asset(
-                asset!,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-              ),
+              child: AssetPath.isRemote(normalized)
+                  ? CachedNetworkImage(
+                      imageUrl: normalized,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                      placeholder: (_, __) =>
+                          const Center(child: Icon(Icons.image_outlined)),
+                      errorWidget: (_, e, __) {
+                        debugPrint('ChoiceTile image load error: $normalized -> $e');
+                        return const Center(child: Icon(Icons.image_outlined));
+                      },
+                    )
+                  : Image.asset(
+                      normalized,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                      errorBuilder: (_, e, __) {
+                        debugPrint('ChoiceTile asset load error: $normalized -> $e');
+                        return const Center(child: Icon(Icons.image_outlined));
+                      },
+                    ),
             ),
     );
   }

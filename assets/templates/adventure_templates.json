@@ -41,142 +41,93 @@
         { "text": "The end. Great job, {hero}!" }
       ]
     },
+
     {
-  "id": "space_adventure_01",
-  "title": "Space Adventure",
-  "ageBand": "4-5",
-  "coverAsset": "assets/images/adventure/space_cover.png",
-  "slots": [],
-  "choices": {},
-  "pages": [
-    { "text": "3…2…1… BLAST OFF! 🚀" },
-    { "text": "You float inside the rocket like a tiny astronaut." },
-    {
-      "text": "Oh no! A space signal is blinking. What do you do?",
-      "choices": [
+      "id": "space_adventure_v2",
+      "title": "Space Adventure",
+      "ageBand": "4-7",
+      "coverAsset": "images/adventure/space/space_cover.png",
+      "slots": [],
+      "choices": {},
+      "pages": [
         {
-          "id": "follow_lights",
-          "label": "Follow the lights",
-          "nextPageIndex": 3,
-          "imageAsset": "assets/images/adventure/choice_lights.png"
+          "text": "🚀 Blast off!\nYou climb into your rocket and zoom into space.\nStars sparkle all around you.",
+            "imageAsset": "images/adventure/space/page_1.png"
         },
+
         {
-          "id": "follow_beeps",
-          "label": "Follow the beeps",
-          "nextPageIndex": 4,
-          "imageAsset": "assets/images/adventure/choice_beeps.png"
-        }
-      ]
-    },
-    { "text": "You zoom toward glowing space lights. 🌟 They lead to a friendly satellite!" },
-    { "text": "You follow the beeps… BEEP BEEP! 🤖 A tiny robot waves at you!" },
-    { "text": "Both paths lead to the Moon Gate. A big door opens… WHOOSH!" }
-  ]
-},
-{
-  "id": "space_adventure_v1",
-  "title": "Space Adventure",
-  "ageBand": "4-5",
-  "coverAsset": "assets/images/adventure/space/space_cover.png",
-
-  "slots": [],
-
-  "choices": {},
-
-  "pages": [
-    {
-      "text": "Leo puts on his shiny space suit.\nToday is a big space adventure!"
-    },
-
-    {
-      "text": "Leo flies his rocket into space.\nStars twinkle all around him."
-    },
-
-    {
-      "text": "Where should Leo go first?",
-      "choices": [
-        {
-          "id": "moon",
-          "label": "Fly to the Moon",
-          "nextPageIndex": 3,
-          "imageAsset": "assets/images/adventure/space/choice_moon.png"
+          "text": "Your rocket slows down.\nA space mission is waiting!",
+           "imageAsset": "images/adventure/space/page_1.png"
         },
+
         {
-          "id": "station",
-          "label": "Visit the Space Station",
-          "nextPageIndex": 4,
-          "imageAsset": "assets/images/adventure/space/choice_station.png"
-        }
-      ]
-    },
-
-    {
-      "text": "Leo lands softly on the Moon.\nHe makes a funny bouncing jump!"
-    },
-
-    {
-      "text": "Leo docks at the space station.\nLights blink and doors open."
-    },
-
-    {
-      "text": "Suddenly, something floats past Leo.\nWho should help him?",
-      "choices": [
-        {
-          "id": "robot",
-          "label": "Friendly Robot",
-          "nextPageIndex": 6,
-          "imageAsset": "assets/images/adventure/space/choice_robot.png"
+          "text": "Where should we explore first?",
+          "choices": [
+            { "id": "c_moon", "label": "The Moon", "nextPageIndex": 3, "imageAsset": "images/adventure/space/choice_moon.png" },
+            { "id": "c_station", "label": "Space Station", "nextPageIndex": 4, "imageAsset": "images/adventure/space/choice_station.png" }
+          ],
+             "imageAsset": "images/adventure/space/page_2.png"
         },
+
         {
-          "id": "alien",
-          "label": "Green Alien",
-          "nextPageIndex": 7,
-          "imageAsset": "assets/images/adventure/space/choice_alien.png"
-        }
-      ]
-    },
+          "text": "🌕 You land on the Moon!\nYour boots bounce on the dusty ground.\nYou feel light as a feather.",
+          "nextPageIndex": 5,
+          "imageAsset": "images/adventure/space/page_3.png"
+        },
 
-    {
-      "text": "The robot beeps happily and shows Leo a map."
-    },
-
-    {
-      "text": "The alien waves and points toward a glowing planet."
-    },
-
-    {
-      "text": "A big space rock blocks the way.\nWhat should Leo use?",
-      "choices": [
         {
-          "id": "net",
-          "label": "Space Net",
+          "text": "🛰️ You dock at the Space Station.\nDoors slide open.\nFriendly lights blink hello.",
+          "nextPageIndex": 5,
+            "imageAsset": "images/adventure/space/page_4.png"
+        },
+
+        {
+          "text": "🚨 Alert!\nA small satellite is drifting away.\nIt needs your help!",
+            "imageAsset": "images/adventure/space/page_5.png"
+        },
+
+        {
+          "text": "Which tool should we use?",
+          "choices": [
+            { "id": "c_laser", "label": "Laser Tool", "nextPageIndex": 7, "imageAsset": "images/adventure/space/choice_laser.png" },
+            { "id": "c_net", "label": "Capture Net", "nextPageIndex": 8, "imageAsset": "images/adventure/space/choice_net.png" }
+          ],
+            "imageAsset": "images/adventure/space/page_6.png"
+        },
+
+        {
+          "text": "🔦 You aim the laser carefully.\nZzzap!\nThe satellite powers back on.",
           "nextPageIndex": 9,
-          "imageAsset": "assets/images/adventure/space/choice_net.png"
+            "imageAsset": "images/adventure/space/page_7.png"
         },
+
         {
-          "id": "laser",
-          "label": "Gentle Laser",
-          "nextPageIndex": 10,
-          "imageAsset": "assets/images/adventure/space/choice_laser.png"
+          "text": "🕸️ You throw the net.\nWhoosh!\nThe satellite is safely caught.",
+          "nextPageIndex": 9,
+             "imageAsset": "images/adventure/space/page_8.png"
+        },
+
+        {
+          "text": "✨ Great job!\nThe satellite is safe.\nOne last thing before heading home...",
+             "imageAsset": "images/adventure/space/page_9.png"
+        },
+
+        {
+          "text": "Who should help you finish the mission?",
+          "choices": [
+            { "id": "c_robot", "label": "Robot Helper", "nextPageIndex": 11, "imageAsset": "images/adventure/space/choice_robot.png" },
+            { "id": "c_alien", "label": "Friendly Alien", "nextPageIndex": 11, "imageAsset": "images/adventure/space/choice_alien.png" }
+          ],
+           "imageAsset": "images/adventure/space/page_9.png"
+        },
+
+        {
+          "text": "🎉 Mission complete!\nWith teamwork and bravery, you save the day.\nYou fly home as a space hero.",
+           "imageAsset": "images/adventure/space/page_10.png"
         }
       ]
-    },
-
-    {
-      "text": "Leo catches the rock with the net.\nSafe and sound!"
-    },
-
-    {
-      "text": "The laser glows softly.\nThe rock floats away."
-    },
-
-    {
-      "text": "The path is clear.\nLeo smiles and flies home.\nWhat a great space adventure!"
     }
-  ]
-}
+  
 
-
-
-  ]
+]
 }

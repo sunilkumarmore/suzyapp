@@ -114,6 +114,7 @@ class _CreateAdventureScreenState extends State<CreateAdventureScreen> {
         StoryPage(
           index: i,
           text: _render(pt.text),
+          imageAsset: pt.imageAsset,
           choices: pt.choices
               .map((c) => StoryChoice(
                     id: c.id,

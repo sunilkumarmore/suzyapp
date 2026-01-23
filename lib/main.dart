@@ -20,6 +20,9 @@ import 'repositories/local_progress_repository.dart';
 import 'repositories/mock_progress_repository.dart';
 
 import 'repositories/asset_adventure_template_repository.dart';
+import 'repositories/adventure_template_repository.dart';
+import 'repositories/composite_adventure_template_repository.dart';
+import 'repositories/firestore_adventure_template_repository.dart';
 import 'repositories/parent_voice_settings_repository.dart';
 
 import 'screens/home_screen.dart';
@@ -43,6 +46,12 @@ Future<void> main() async {
   final StoryRepository storyRepo = CompositeStoryRepository(
     primary: FirestoreStoryRepository(),
     fallback: MockStoryRepository(),
+  );
+
+  final AdventureTemplateRepository templateRepo =
+      CompositeAdventureTemplateRepository(
+    primary: FirestoreAdventureTemplateRepository(),
+    fallback: AssetAdventureTemplateRepository(),
   );
 
   // final ProgressRepository progressRepo = CompositeProgressRepository(
@@ -72,6 +81,7 @@ Future<void> main() async {
     SuzyApp(
       storyRepository: storyRepo,
       progressRepository: progressRepo,
+      adventureTemplateRepository: templateRepo,
     ),
   );
 }
@@ -104,11 +114,13 @@ Future<void> configureAuthPersistenceForWeb() async {
 class SuzyApp extends StatefulWidget {
   final StoryRepository storyRepository;
   final ProgressRepository progressRepository;
+  final AdventureTemplateRepository adventureTemplateRepository;
 
   const SuzyApp({
     super.key,
     required this.storyRepository,
     required this.progressRepository,
+    required this.adventureTemplateRepository,
   });
 
   @override
@@ -181,7 +193,7 @@ class _SuzyAppState extends State<SuzyApp>
         '/parent-voice': (_) => const ParentVoiceSettingsScreen(),
 
         '/create': (_) => CreateAdventureScreen(
-              templateRepository: AssetAdventureTemplateRepository(),
+              templateRepository: widget.adventureTemplateRepository,
               progressRepository: widget.progressRepository,
             ),
 

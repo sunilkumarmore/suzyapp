@@ -143,7 +143,7 @@ class _StoryLibraryScreenState extends State<StoryLibraryScreen> {
                       crossAxisCount: cols,
                       crossAxisSpacing: AppSpacing.medium,
                       mainAxisSpacing: AppSpacing.medium,
-                      childAspectRatio: 0.72,
+                      childAspectRatio: 0.74,
                     ),
                     itemBuilder: (context, i) {
                       final s = stories[i];
@@ -341,9 +341,6 @@ class _StoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = _accentFor(story);
-
-    // coverAsset is sometimes empty for now; treat it as empty string safely.
-    //final cover = (story.coverAsset ?? '').trim();
     final coverRaw = story.coverAsset?.trim() ?? '';
     final cover = AssetPath.normalize(coverRaw);
     final coverIsRemote = AssetPath.isRemote(coverRaw);
@@ -366,26 +363,27 @@ class _StoryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top: cover area (dominant, keeps layout proportional)
-            Expanded(
-              flex: 7,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: accent.withOpacity(0.18),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(AppRadius.large),
-                    topRight: Radius.circular(AppRadius.large),
+            // Top: cover area (fixed height)
+            SizedBox(
+              height: 120,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: accent.withOpacity(0.18),
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(AppRadius.large),
+                        topRight: Radius.circular(AppRadius.large),
+                      ),
+                    ),
                   ),
-                ),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    if (cover.isNotEmpty)
-                      ClipRRect(
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(AppRadius.large),
-                          topRight: Radius.circular(AppRadius.large),
-                        ),
+                  if (cover.isNotEmpty)
+                    ClipRRect(
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(AppRadius.large),
+                        topRight: Radius.circular(AppRadius.large),
+                      ),
                       child: coverIsRemote
                           ? CachedNetworkImage(
                               imageUrl: cover,
@@ -410,12 +408,11 @@ class _StoryCard extends StatelessWidget {
                                 );
                               },
                             ),
-                      )
-                    else
-                      Center(child: Icon(Icons.image, size: 48, color: accent)),
-
-                    // subtle overlay so the badge pops on bright covers
-                    Container(
+                    )
+                  else
+                    Center(child: Icon(Icons.image, size: 48, color: accent)),
+                  IgnorePointer(
+                    child: Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.only(
                           topLeft: Radius.circular(AppRadius.large),
@@ -425,25 +422,23 @@ class _StoryCard extends StatelessWidget {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Colors.black.withOpacity(0.22),
+                            Colors.black.withOpacity(0.20),
                             Colors.transparent,
                           ],
                         ),
                       ),
                     ),
-
-                    if (inProgress)
-                      Positioned(
-                        top: 10,
-                        left: 10,
-                        child: _Badge(text: 'Continue', color: AppColors.accentCoral),
-                      ),
-                  ],
-                ),
+                  ),
+                  if (inProgress)
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: _Badge(text: 'Continue', color: AppColors.accentCoral),
+                    ),
+                ],
               ),
             ),
-
-            // Bottom: compact metadata area
+            // Bottom: take remaining height safely
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.medium),
@@ -452,29 +447,29 @@ class _StoryCard extends StatelessWidget {
                   children: [
                     Text(
                       story.title,
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: 16,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
-                        height: 1.15,
+                        height: 1.1,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.small),
-                    Wrap(
-                      spacing: AppSpacing.small,
-                      runSpacing: AppSpacing.small,
+                    Row(
                       children: [
                         _Badge(text: story.ageBand, color: accent),
+                        const SizedBox(width: AppSpacing.small),
                         _Badge(
                           text: story.language.toUpperCase(),
                           color: AppColors.textSecondary,
                           fill: AppColors.textSecondary.withOpacity(0.12),
                         ),
+                        const Spacer(),
                       ],
                     ),
-                    const Spacer(),
+                    const SizedBox(height: 2),
                   ],
                 ),
               ),

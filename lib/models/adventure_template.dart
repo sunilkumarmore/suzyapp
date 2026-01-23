@@ -33,6 +33,12 @@ class AdventureTemplate {
   factory AdventureTemplate.fromJson(Map<String, dynamic> json) {
     final slots = (json['slots'] as List<dynamic>? ?? []).cast<String>();
 
+    final cover = _string(json['coverAsset']) ??
+        _string(json['coverUrl']) ??
+        _string(json['cover_url']) ??
+        _string(json['coverPath']) ??
+        _string(json['cover_path']);
+
     final rawChoices = (json['choices'] as Map<String, dynamic>? ?? {});
     final parsedChoices = <String, List<AdventureChoice>>{};
     for (final entry in rawChoices.entries) {
@@ -53,7 +59,7 @@ class AdventureTemplate {
       slots: slots,
       choices: parsedChoices,
       pages: pages,
-      coverAsset: json['coverAsset'] as String?,
+      coverAsset: cover,
     );
   }
 
@@ -77,17 +83,24 @@ class AdventureChoice {
       id: json['id'] as String,
       label: json['label'] as String? ?? '',
       emoji: json['emoji'] as String? ?? '?o"',
-      imageAsset: json['imageAsset'] as String?,
+      imageAsset: _string(json['imageAsset']) ??
+          _string(json['imageUrl']) ??
+          _string(json['image_url']) ??
+          _string(json['image']) ??
+          _string(json['imagePath']) ??
+          _string(json['image_path']),
     );
   }
 }
 
 class AdventurePageTemplate {
   final String text;
+  final String? imageAsset;
   final List<AdventurePageChoice> choices;
 
   AdventurePageTemplate({
     required this.text,
+    this.imageAsset,
     this.choices = const [],
   });
 
@@ -96,6 +109,12 @@ class AdventurePageTemplate {
   factory AdventurePageTemplate.fromJson(Map<String, dynamic> json) {
     return AdventurePageTemplate(
       text: json['text'] as String? ?? '',
+      imageAsset: _string(json['imageAsset']) ??
+          _string(json['imageUrl']) ??
+          _string(json['image_url']) ??
+          _string(json['image']) ??
+          _string(json['imagePath']) ??
+          _string(json['image_path']),
       choices: (json['choices'] as List? ?? const [])
           .map((e) => AdventurePageChoice.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -121,7 +140,17 @@ class AdventurePageChoice {
       id: json['id'] as String,
       label: json['label'] as String? ?? '',
       nextPageIndex: (json['nextPageIndex'] as num?)?.toInt() ?? 0,
-      imageAsset: json['imageAsset'] as String?,
+      imageAsset: _string(json['imageAsset']) ??
+          _string(json['imageUrl']) ??
+          _string(json['image_url']) ??
+          _string(json['image']) ??
+          _string(json['imagePath']) ??
+          _string(json['image_path']),
     );
   }
+}
+
+String? _string(dynamic v) {
+  if (v is String) return v.trim();
+  return null;
 }

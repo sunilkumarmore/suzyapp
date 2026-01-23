@@ -24,6 +24,7 @@ import '../repositories/progress_repository.dart';
 import '../repositories/story_repository.dart';
 import '../widgets/adventure_scene.dart';
 import '../widgets/choice_tile.dart';
+import '../widgets/read_to_me_button.dart';
 import 'story_completion_screen.dart';
 
 class StoryReaderScreen extends StatefulWidget {
@@ -76,12 +77,14 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
   bool _parentVoiceDegraded = false; // once true, skip parent voice for this session
 
   bool _swipeHintSeen = false; // show hint only once per install/session
+  bool _showSwipeHint = true;
+  bool _userHasSwiped = false;
   bool _choiceLocked = false;
   int? _selectedChoiceIdx;
   int? _sparkleChoiceIdx;
 
   final AudioPlayer _player = AudioPlayer();
- // final AudioPlayer _sfxPlayer = AudioPlayer();
+  final AudioPlayer _sfxPlayer = AudioPlayer();
   final FlutterTts _tts = FlutterTts();
 
   @override
@@ -121,7 +124,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
   void dispose() {
     _stopAllAudio(); // stop before dispose
     _player.dispose();
-   // _sfxPlayer.dispose();
+    _sfxPlayer.dispose();
     if (_pageControllerReady) {
       _pageController.dispose();
     }
@@ -185,6 +188,17 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
       _isPlayingAudio = false;
       _isSpeakingTts = false;
     });
+  }
+
+  Future<void> _playPageFlipSfx() async {
+    try {
+      await _sfxPlayer.setAsset('assets/audio/sfx/page_flip.mp3');
+      await _sfxPlayer.setVolume(0.18); // very soft
+      await _sfxPlayer.seek(Duration.zero);
+      await _sfxPlayer.play();
+    } catch (_) {
+      // ignore if missing/failed
+    }
   }
 
   Future<void> _playUrl(String url) async {
@@ -311,6 +325,21 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
     }
   }
 
+  Future<void> _toggleReadAloud() async {
+    final story = _storyCache;
+    if (story == null) return;
+
+    final nowOn = !_readAloudEnabled;
+    setState(() => _readAloudEnabled = nowOn);
+
+    if (nowOn) {
+      final page = story.pages[_pageIndex];
+      await _playReadAloud(story, page);
+    } else {
+      await _stopAllAudio();
+    }
+  }
+
   // ---------- Progress helpers ----------
 
   Future<void> _saveReadingProgress() async {
@@ -371,8 +400,15 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
 
     // Stop current audio before switching pages
     await _stopAllAudio();
+    await _playPageFlipSfx();
 
-    setState(() => _pageIndex = newIndex);
+    setState(() {
+      if (!_userHasSwiped) {
+        _userHasSwiped = true;
+        _showSwipeHint = false;
+      }
+      _pageIndex = newIndex;
+    });
 
     unawaited(_saveReadingProgress());
     unawaited(_saveStoryProgress());
@@ -477,6 +513,8 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
   }) {
     final pageNum = index + 1;
     final value = total == 0 ? 0.0 : pageNum / total;
+    final barColor = Color.lerp(AppColors.primaryYellow, AppColors.accentCoral, value) ??
+        AppColors.primaryYellow;
     final prev = onPrev ??
         (index > 0
             ? () {
@@ -495,34 +533,38 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
     return Row(
       children: [
         IconButton(
+          visualDensity: VisualDensity.compact,
           onPressed: prev,
-          icon: const Icon(Icons.chevron_left),
+          icon: Icon(
+            Icons.chevron_left,
+            color: AppColors.textSecondary.withOpacity(0.7),
+          ),
         ),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              LinearProgressIndicator(
-                value: value,
-                minHeight: 6,
-                backgroundColor: AppColors.outline.withOpacity(0.35),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Page $pageNum of $total',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary.withOpacity(0.85),
-                ),
-              ),
-            ],
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0, end: value),
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
+              builder: (context, v, _) {
+                return LinearProgressIndicator(
+                  minHeight: 10,
+                  value: v,
+                  backgroundColor: AppColors.surface,
+                  valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                );
+              },
+            ),
           ),
         ),
         IconButton(
+          visualDensity: VisualDensity.compact,
           onPressed: next,
-          icon: const Icon(Icons.chevron_right),
+          icon: Icon(
+            Icons.chevron_right,
+            color: AppColors.textSecondary.withOpacity(0.7),
+          ),
         ),
       ],
     );
@@ -644,6 +686,16 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
     required int realIndex,
     required bool isCreatedStory,
   }) {
+    final isLastPage = realIndex >= story.pages.length - 1;
+    if (page.hasChoices) {
+      return _buildChoicePage(
+        story: story,
+        page: page,
+        isCreatedStory: isCreatedStory,
+        isLastPage: isLastPage,
+      );
+    }
+
     final imageFlex = _imageFlexFor(story.ageBand, page.text);
     final textFlex = 10 - imageFlex;
 
@@ -663,15 +715,30 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
               child: Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: AppColors.background,
                   borderRadius: BorderRadius.circular(AppRadius.large),
                 ),
-                child: AdventureScene(
-                  backgroundAsset: AssetPath.normalize(page.backgroundAsset ?? page.imageAsset),
-                  heroAsset: AssetPath.normalize(page.heroAsset),
-                  friendAsset: AssetPath.normalize(page.friendAsset),
-                  objectAsset: AssetPath.normalize(page.objectAsset),
-                  emotionEmoji: page.emotionEmoji,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 350),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  transitionBuilder: (child, anim) {
+                    return FadeTransition(
+                      opacity: anim,
+                      child: ScaleTransition(
+                        scale: Tween<double>(begin: 0.985, end: 1.0).animate(anim),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: AdventureScene(
+                    key: ValueKey('scene_${page.index}'),
+                    backgroundAsset: AssetPath.normalize(page.backgroundAsset ?? page.imageAsset),
+                    heroAsset: AssetPath.normalize(page.heroAsset),
+                    friendAsset: AssetPath.normalize(page.friendAsset),
+                    objectAsset: AssetPath.normalize(page.objectAsset),
+                    emotionEmoji: page.emotionEmoji,
+                  ),
                 ),
               ),
             ),
@@ -684,15 +751,22 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(AppSpacing.large),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: AppColors.background,
                   borderRadius: BorderRadius.circular(AppRadius.large),
                 ),
                 child: SingleChildScrollView(
-                  child: Text(
-                    page.text,
-                    style: TextStyle(
-                      fontSize: story.ageBand == '2-3' ? 18 : 20,
-                      height: 1.25,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      child: Text(
+                        page.text,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: story.ageBand == '2-3' ? 20 : 22,
+                          height: 1.4,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -701,74 +775,39 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
 
             const SizedBox(height: AppSpacing.medium),
 
-            if (page.hasChoices) ...[
-              const SizedBox(height: AppSpacing.small),
-              Text(
-                'Tap a picture',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textSecondary,
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: ReadToMeButton(
+                  enabled: _readAloudEnabled,
+                  isPlaying: _isPlayingAudio || _isSpeakingTts,
+                  onTap: _toggleReadAloud,
                 ),
               ),
-              const SizedBox(height: AppSpacing.small),
-              if (isCreatedStory)
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: page.choices.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: AppSpacing.medium,
-                    crossAxisSpacing: AppSpacing.medium,
-                    childAspectRatio: 1.05,
-                  ),
-                  itemBuilder: (context, i) {
-                    final c = page.choices[i];
-                    final img = AssetPath.normalize(c.imageAsset);
-                    return ChoiceTile(
-                      label: c.label,
-                      imageAsset: img,
-                      selected: false,
-                      showSparkle: _showChoiceSparkle,
-                      disabled: false,
-                      onTap: () => _commitChoiceBranch(
-                        story: story,
-                        choicePage: page,
-                        picked: c,
-                      ),
-                    );
-                  },
-                )
-              else
-                Wrap(
-                  spacing: AppSpacing.small,
-                  runSpacing: AppSpacing.small,
-                  children: page.choices.map((c) {
-                    return ElevatedButton(
-                      onPressed: () => _setPage(c.nextPageIndex),
-                      child: Text(c.label),
-                    );
-                  }).toList(),
-                ),
-              const SizedBox(height: AppSpacing.small),
-            ],
-
-            _ProgressRow(
-              index: isCreatedStory ? _pathPos : _pageIndex,
-              total: isCreatedStory ? _path.length : story.pages.length,
-              onPrev: isCreatedStory && _pathPos > 0
-                  ? () => _pageController.previousPage(
-                        duration: const Duration(milliseconds: 260),
-                        curve: Curves.easeOut,
-                      )
-                  : null,
-              onNext: isCreatedStory && _pathPos < _path.length - 1
-                  ? () => _pageController.nextPage(
-                        duration: const Duration(milliseconds: 260),
-                        curve: Curves.easeOut,
-                      )
-                  : null,
             ),
+
+            const SizedBox(height: AppSpacing.medium),
+
+              const SizedBox(height: AppSpacing.medium),
+
+              _ProgressRow(
+                index: isCreatedStory ? _pathPos : _pageIndex,
+                total: isCreatedStory ? _path.length : story.pages.length,
+                onPrev: isCreatedStory && _pathPos > 0
+                    ? () => _pageController.previousPage(
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeOut,
+                        )
+                    : null,
+                onNext: isCreatedStory && _pathPos < _path.length - 1
+                    ? () => _pageController.nextPage(
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeOut,
+                        )
+                    : (isCreatedStory && isLastPage
+                        ? () => _showCompletion(story)
+                        : (!isCreatedStory && isLastPage ? () => _showCompletion(story) : null)),
+              ),
 
             if (_isPlayingAudio || _isSpeakingTts) ...[
               const SizedBox(height: AppSpacing.small),
@@ -800,8 +839,136 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
                 ),
               ),
             ),
-          ),
+        ),
       ],
+    );
+  }
+
+  Widget _buildChoicePage({
+    required Story story,
+    required StoryPage page,
+    required bool isCreatedStory,
+    required bool isLastPage,
+  }) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final h = c.maxHeight;
+
+        final imageH = (h * 0.34).clamp(160.0, 260.0);
+        final promptH = (h * 0.16).clamp(70.0, 120.0);
+        final bottomH = 78.0;
+        const gap = 12.0;
+
+        final choicesH = (h - imageH - promptH - bottomH - gap * 3)
+            .clamp(140.0, 360.0);
+
+        return Stack(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: imageH,
+                  child: _buildSceneOrImage(page),
+                ),
+                const SizedBox(height: gap),
+                SizedBox(
+                  height: promptH,
+                  child: _PromptCard(
+                    text: page.text,
+                    maxLines: 3,
+                    fontSize: story.ageBand == '2-3' ? 20 : 22,
+                  ),
+                ),
+                const SizedBox(height: gap),
+                SizedBox(
+                  height: choicesH,
+                  child: _TwoChoiceTiles(
+                    choices: page.choices,
+                    showSparkle: _showChoiceSparkle,
+                    disabled: false,
+                    onPick: (choice) {
+                      if (isCreatedStory) {
+                        _commitChoiceBranch(
+                          story: story,
+                          choicePage: page,
+                          picked: choice,
+                        );
+                      } else {
+                        _setPage(choice.nextPageIndex);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(height: gap),
+                SizedBox(
+                  height: bottomH,
+                  child: _ProgressRow(
+                    index: isCreatedStory ? _pathPos : _pageIndex,
+                    total: isCreatedStory ? _path.length : story.pages.length,
+                    onPrev: isCreatedStory && _pathPos > 0
+                        ? () => _pageController.previousPage(
+                              duration: const Duration(milliseconds: 260),
+                              curve: Curves.easeOut,
+                            )
+                        : null,
+                    onNext: isCreatedStory && _pathPos < _path.length - 1
+                        ? () => _pageController.nextPage(
+                              duration: const Duration(milliseconds: 260),
+                              curve: Curves.easeOut,
+                            )
+                        : (isCreatedStory && isLastPage ? () => _showCompletion(story) : null),
+                  ),
+                ),
+              ],
+            ),
+            if (_showChoiceSparkle)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: _showChoiceSparkle ? 1 : 0,
+                    duration: const Duration(milliseconds: 120),
+                    child: Container(
+                      color: Colors.white.withOpacity(0.08),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSceneOrImage(StoryPage page) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(AppRadius.large),
+      ),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 350),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        transitionBuilder: (child, anim) {
+          return FadeTransition(
+            opacity: anim,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.985, end: 1.0).animate(anim),
+              child: child,
+            ),
+          );
+        },
+        child: AdventureScene(
+          key: ValueKey('scene_${page.index}'),
+          backgroundAsset: AssetPath.normalize(page.backgroundAsset ?? page.imageAsset),
+          heroAsset: AssetPath.normalize(page.heroAsset),
+          friendAsset: AssetPath.normalize(page.friendAsset),
+          objectAsset: AssetPath.normalize(page.objectAsset),
+          emotionEmoji: page.emotionEmoji,
+        ),
+      ),
     );
   }
 
@@ -874,9 +1041,9 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
         mediumMax = 260;
     }
 
-    if (len <= shortMax) return 6;
-    if (len <= mediumMax) return 5;
-    return 4;
+    if (len <= shortMax) return 7;
+    if (len <= mediumMax) return 6;
+    return 5;
   }
 
   // ---------- UI ----------
@@ -889,29 +1056,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
         title: const Text('Read'),
         backgroundColor: AppColors.background,
         elevation: 0,
-        actions: [
-          IconButton(
-            tooltip: _readAloudEnabled ? 'Read aloud: On' : 'Read aloud: Off',
-            icon: Icon(_readAloudEnabled ? Icons.volume_up : Icons.volume_off),
-            onPressed: () async {
-              final story = _storyCache;
-              if (story == null) return;
-              final isCreatedStory = story.id.startsWith('created_');
-              if (isCreatedStory && _path.isEmpty) return;
-
-              final toggledOn = !_readAloudEnabled;
-              setState(() => _readAloudEnabled = toggledOn);
-
-              if (toggledOn) {
-                final realIndex = realIndexFor(story, isCreatedStory);
-                final page = story.pages[realIndex];
-                await _playReadAloud(story, page);
-              } else {
-                await _stopAllAudio();
-              }
-            },
-          ),
-        ],
+        actions: const [],
       ),
       body: FutureBuilder<Story>(
         future: _future,
@@ -949,44 +1094,210 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
             return _buildCreatedStoryPager(story);
           }
 
-          return GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onHorizontalDragEnd: (details) {
-              final vx = details.primaryVelocity ?? 0;
+          return Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.large),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onHorizontalDragEnd: (details) {
+                    final vx = details.primaryVelocity ?? 0;
 
-              if (vx < -250) {
-                _markSwiped();
-                if (_pageIndex < story.pages.length - 1) {
-                  _setPage(_pageIndex + 1);
-                } else {
-                  _showCompletion(story);
-                }
-              }
+                    if (vx < -250) {
+                      _markSwiped();
+                      if (_pageIndex < story.pages.length - 1) {
+                        _setPage(_pageIndex + 1);
+                      } else {
+                        _showCompletion(story);
+                      }
+                    }
 
-              if (vx > 250) {
-                _markSwiped();
-                if (_pageIndex > 0) {
-                  _setPage(_pageIndex - 1);
-                }
-              }
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.large),
-              child: Stack(
-                children: [
-                  _buildStoryPageContent(
+                    if (vx > 250) {
+                      _markSwiped();
+                      if (_pageIndex > 0) {
+                        _setPage(_pageIndex - 1);
+                      }
+                    }
+                  },
+                  child: _buildStoryPageContent(
                     story: story,
                     page: page,
                     realIndex: realIndex,
                     isCreatedStory: false,
                   ),
-                  _SwipeHintOverlay(show: !_swipeHintSeen && _pageIndex == 0),
-                ],
+                ),
               ),
-            ),
+              if (_showSwipeHint && safeIndex == 0)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 82,
+                  child: const IgnorePointer(
+                    child: _SwipeHint(),
+                  ),
+                ),
+            ],
           );
         },
       ),
+    );
+  }
+}
+
+class _PromptCard extends StatelessWidget {
+  final String text;
+  final int maxLines;
+  final double fontSize;
+
+  const _PromptCard({
+    required this.text,
+    required this.maxLines,
+    required this.fontSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.large),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(AppRadius.large),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Text(
+            text,
+            maxLines: maxLines,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: fontSize,
+              height: 1.4,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TwoChoiceTiles extends StatelessWidget {
+  final List<StoryChoice> choices;
+  final ValueChanged<StoryChoice> onPick;
+  final bool showSparkle;
+  final bool disabled;
+
+  const _TwoChoiceTiles({
+    required this.choices,
+    required this.onPick,
+    required this.showSparkle,
+    required this.disabled,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final a = choices.isNotEmpty ? choices[0] : null;
+    final b = choices.length > 1 ? choices[1] : null;
+
+    return Row(
+      children: [
+        Expanded(
+          child: a == null
+              ? const SizedBox()
+              : ChoiceTileBig(
+                  choice: a,
+                  showSparkle: showSparkle,
+                  disabled: disabled,
+                  onTap: () => onPick(a),
+                ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: b == null
+              ? const SizedBox()
+              : ChoiceTileBig(
+                  choice: b,
+                  showSparkle: showSparkle,
+                  disabled: disabled,
+                  onTap: () => onPick(b),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class ChoiceTileBig extends StatelessWidget {
+  final StoryChoice choice;
+  final VoidCallback onTap;
+  final bool showSparkle;
+  final bool disabled;
+
+  const ChoiceTileBig({
+    super.key,
+    required this.choice,
+    required this.onTap,
+    required this.showSparkle,
+    required this.disabled,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final img = AssetPath.normalize(choice.imageAsset);
+    return ChoiceTile(
+      label: choice.label,
+      imageAsset: img,
+      selected: false,
+      showSparkle: showSparkle,
+      disabled: disabled,
+      height: double.infinity,
+      onTap: onTap,
+    );
+  }
+}
+
+class _SwipeHint extends StatefulWidget {
+  const _SwipeHint();
+
+  @override
+  State<_SwipeHint> createState() => _SwipeHintState();
+}
+
+class _SwipeHintState extends State<_SwipeHint> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, __) {
+        final t = _c.value;
+        return Opacity(
+          opacity: 0.35 + (0.35 * t),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(Icons.chevron_left, size: 30),
+              SizedBox(width: 8),
+              Icon(Icons.swipe, size: 22),
+              SizedBox(width: 8),
+              Icon(Icons.chevron_right, size: 30),
+            ],
+          ),
+        );
+      },
     );
   }
 }

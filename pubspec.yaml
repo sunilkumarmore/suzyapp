@@ -71,6 +71,7 @@ flutter:
     - assets/images/adventure/space/
     - assets/images/shy_lion_roar/
     - assets/audio/
+    - assets/audio/sfx/page_flip.mp3
     - assets/templates/
 
   # The following line ensures that the Material Icons font is
