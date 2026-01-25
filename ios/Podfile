@@ -1,45 +1,55 @@
 platform :ios, '15.0'
-
-# Uncomment this line to define a global platform for your project
-# platform :ios, '15.0'
-
-# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
-project 'Runner', {
-  'Debug' => :debug,
-  'Profile' => :release,
-  'Release' => :release,
-}
+project 'Runner', { 'Debug' => :debug, 'Profile' => :release, 'Release' => :release }
 
 def flutter_root
   generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
-  unless File.exist?(generated_xcode_build_settings_path)
-    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
-  end
-
-  File.foreach(generated_xcode_build_settings_path) do |line|
-    matches = line.match(/FLUTTER_ROOT\=(.*)/)
-    return matches[1].strip if matches
-  end
-  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
+  File.exist?(generated_xcode_build_settings_path) ? 
+    File.foreach(generated_xcode_build_settings_path).grep(/FLUTTER_ROOT\=(.*)/){$1.strip}.first : "" 
 end
 
 require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
 
+# Explicit list for gRPC/Firebase stability
+$static_framework_pods = [
+  'FirebaseFirestore', 'FirebaseFirestoreInternal', 'FirebaseCore', 
+  'FirebaseCoreInternal', 'FirebaseSharedSwift', 'FirebaseAppCheckInterop', 
+  'FirebaseAuthInterop', 'gRPC-Core', 'gRPC-C++', 'BoringSSL-GRPC', 
+  'LibreBoringSSL', 'leveldb-library', 'abseil'
+]
+
+pre_install do |installer|
+  installer.pod_targets.each do |pod|
+    if $static_framework_pods.include?(pod.name)
+      def pod.build_type; Pod::BuildType.static_framework; end
+    end
+  end
+end
+
 flutter_ios_podfile_setup
 
 target 'Runner' do
-  use_frameworks!
-
+  use_modular_headers!
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-  target 'RunnerTests' do
-    inherit! :search_paths
-  end
 end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      # Fix for gRPC visibility
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      
+      # FORCE Apple's Linker to treat App/Flutter as Dynamic Shared Objects
+      if target.name == 'App' || target.name == 'Flutter'
+        config.build_settings['MACH_O_TYPE'] = 'mh_dylib'
+        # Modern Xcode 26 flag for dynamic linking
+        config.build_settings['OTHER_LDFLAGS'] = '$(inherited) -Wl,-dynamic'
+        # Prevent stripping of the LC_ENCRYPTION_INFO header
+        config.build_settings['STRIP_INSTALLED_PRODUCT'] = 'NO'
+        config.build_settings['DEPLOYMENT_POSTPROCESSING'] = 'NO'
+      end
+    end
   end
 end

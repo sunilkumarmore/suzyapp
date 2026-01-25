@@ -2,29 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-import 'package:suzyapp/repositories/firestore_progress_repository.dart';
-import 'package:suzyapp/screens/privacy_policy_screen.dart';
-
+import 'package:flutter/foundation.dart' show kIsWeb;
+// Firebase & Theme
 import 'firebase_options.dart';
-
 import 'design_system/app_theme.dart';
 
+// Repositories
 import 'repositories/story_repository.dart';
 import 'repositories/mock_story_repository.dart';
 import 'repositories/firestore_story_repository.dart';
 import 'repositories/composite_story_repository.dart';
-
 import 'repositories/progress_repository.dart';
 import 'repositories/composite_progress_repository.dart';
 import 'repositories/local_progress_repository.dart';
 import 'repositories/mock_progress_repository.dart';
-
+import 'repositories/firestore_progress_repository.dart';
 import 'repositories/asset_adventure_template_repository.dart';
 import 'repositories/adventure_template_repository.dart';
 import 'repositories/composite_adventure_template_repository.dart';
 import 'repositories/firestore_adventure_template_repository.dart';
 import 'repositories/parent_voice_settings_repository.dart';
 
+// Screens
 import 'screens/home_screen.dart';
 import 'screens/story_library_screen.dart';
 import 'screens/story_reader_screen.dart';
@@ -33,80 +32,105 @@ import 'screens/parent_summary_screen.dart';
 import 'screens/parent_voice_settings_screen.dart';
 import 'screens/create_adventure_screen.dart';
 import 'screens/firebase_test_screen.dart';
+import 'screens/privacy_policy_screen.dart';
 
+// Services
 import 'services/parent_gate_service.dart';
 
 Future<void> main() async {
+  // 1. Initialize Flutter Bindings
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
 
-  // ---------- Repositories ----------
-  final StoryRepository storyRepo = CompositeStoryRepository(
-    primary: FirestoreStoryRepository(),
-    fallback: MockStoryRepository(),
-  );
-
-  final AdventureTemplateRepository templateRepo =
-      CompositeAdventureTemplateRepository(
-    primary: FirestoreAdventureTemplateRepository(),
-    fallback: AssetAdventureTemplateRepository(),
-  );
-
-  // final ProgressRepository progressRepo = CompositeProgressRepository(
-  //   local: LocalProgressRepository(),
-  //   cloud: MockProgressRepository(), // swap later with FirestoreProgressRepository
-  // );
-
-  final ProgressRepository progressRepo = CompositeProgressRepository(
-  local: LocalProgressRepository(),
-  cloud: FirestoreProgressRepository(),
-);
-
-  // ---------- Auth ----------
- // await configureAuthPersistenceForWeb();
-   // await ensureAnonAuth();
-  await ensureDevAuth(); //disable for production
-
-  // ---------- Parent voice defaults ----------
-  await ParentVoiceSettingsRepository().ensureDefaults();
-
-  final u = FirebaseAuth.instance.currentUser;
-  debugPrint(
-    'AUTH user: uid=${u?.uid} email=${u?.email} anon=${u?.isAnonymous}',
-  );
-
+  // 2. Immediate UI Launch (Kills White Screen on iOS 26)
   runApp(
-    SuzyApp(
-      storyRepository: storyRepo,
-      progressRepository: progressRepo,
-      adventureTemplateRepository: templateRepo,
+    MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              CircularProgressIndicator(),
+              SizedBox(height: 20),
+              Text("Starting SuzyApp...", style: TextStyle(color: Colors.grey)),
+            ],
+          ),
+        ),
+      ),
     ),
   );
+
+  try {
+    // 3. Initialize Firebase
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    // 4. SIGN IN FIRST (Crucial for ParentVoiceSettingsRepository)
+    if (kIsWeb) {
+      await configureAuthPersistenceForWeb();
+    }
+    await ensureAnonAuth();
+   // await ensureDevAuth();
+
+    // 5. Verify Auth State & Setup Defaults
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      debugPrint('AUTH verified: ${user.uid}');
+      // Only call this once we are SURE a user exists to avoid "Bad state"
+      await ParentVoiceSettingsRepository().ensureDefaults();
+    } else {
+      debugPrint('AUTH WARNING: No user found after sign-in.');
+    }
+
+    // 6. Setup Repositories
+    final StoryRepository storyRepo = CompositeStoryRepository(
+      primary: FirestoreStoryRepository(),
+      fallback: MockStoryRepository(),
+    );
+
+    final AdventureTemplateRepository templateRepo =
+        CompositeAdventureTemplateRepository(
+      primary: FirestoreAdventureTemplateRepository(),
+      fallback: AssetAdventureTemplateRepository(),
+    );
+
+    final ProgressRepository progressRepo = CompositeProgressRepository(
+      local: LocalProgressRepository(),
+      cloud: FirestoreProgressRepository(),
+    );
+
+    // 7. Launch the actual App
+    runApp(
+      SuzyApp(
+        storyRepository: storyRepo,
+        progressRepository: progressRepo,
+        adventureTemplateRepository: templateRepo,
+      ),
+    );
+  } catch (e) {
+    debugPrint("❌ CRITICAL BOOT ERROR: $e");
+    // Show error on phone screen so it doesn't stay stuck on spinner
+    runApp(MaterialApp(home: Scaffold(body: Center(child: Text("Error: $e")))));
+  }
 }
 
 // ================== AUTH HELPERS ==================
 
-Future<void> ensureAnonAuth() async {
+Future<void> ensureDevAuth() async {
+  if (!kDebugMode) return; 
+
+  const email = 'dev@suzyapp.local';
+  const password = 'DevPassword123!';
   final auth = FirebaseAuth.instance;
 
-  if (auth.currentUser != null) {
-    if (kDebugMode) {
-      debugPrint('AUTH already signed in uid=${auth.currentUser!.uid}');
-    }
-    return;
+  if (auth.currentUser?.email == email) return;
+
+  try {
+    await auth.signInWithEmailAndPassword(email: email, password: password);
+  } catch (_) {
+    await auth.createUserWithEmailAndPassword(email: email, password: password);
   }
-
-  final cred = await auth.signInAnonymously();
-
-  if (kDebugMode) {
-    debugPrint('AUTH anonymous uid=${cred.user?.uid}');
-  }
-}
-
-Future<void> configureAuthPersistenceForWeb() async {
-  await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
 }
 
 // ================== APP ROOT ==================
@@ -127,8 +151,33 @@ class SuzyApp extends StatefulWidget {
   State<SuzyApp> createState() => _SuzyAppState();
 }
 
-class _SuzyAppState extends State<SuzyApp>
-    with WidgetsBindingObserver {
+Future<void> ensureAnonAuth() async {
+  final auth = FirebaseAuth.instance;
+
+  if (auth.currentUser != null) {
+    if (kDebugMode) {
+      debugPrint('AUTH already signed in uid=${auth.currentUser!.uid}');
+    }
+    return;
+  }
+
+  final cred = await auth.signInAnonymously();
+
+  if (kDebugMode) {
+    debugPrint('AUTH anonymous uid=${cred.user?.uid}');
+  }
+}
+
+Future<void> configureAuthPersistenceForWeb() async {
+FirebaseAuth.instance.authStateChanges().listen((User? user) {
+  if (user == null) {
+    print('User is currently signed out!');
+  } else {
+    print('User is signed in!');
+  }
+});
+}
+class _SuzyAppState extends State<SuzyApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
@@ -141,7 +190,6 @@ class _SuzyAppState extends State<SuzyApp>
     super.dispose();
   }
 
-  // 🔐 STEP 4 — Lock Parent Gate when app backgrounds
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
@@ -162,16 +210,13 @@ class _SuzyAppState extends State<SuzyApp>
               storyRepository: widget.storyRepository,
               progressRepository: widget.progressRepository,
             ),
-
         '/library': (_) => StoryLibraryScreen(
               storyRepository: widget.storyRepository,
               progressRepository: widget.progressRepository,
             ),
-
-'/privacy': (_) => const PrivacyPolicyScreen(),
+        '/privacy': (_) => const PrivacyPolicyScreen(),
         '/reader': (ctx) {
-          final args =
-              ModalRoute.of(ctx)!.settings.arguments as StoryReaderArgs;
+          final args = ModalRoute.of(ctx)!.settings.arguments as StoryReaderArgs;
           return StoryReaderScreen(
             storyRepository: widget.storyRepository,
             progressRepository: widget.progressRepository,
@@ -179,66 +224,25 @@ class _SuzyAppState extends State<SuzyApp>
             startPageIndex: args.startPageIndex,
           );
         },
-
         '/complete': (ctx) {
-          final args =
-              ModalRoute.of(ctx)!.settings.arguments as StoryCompletionArgs;
+          final args = ModalRoute.of(ctx)!.settings.arguments as StoryCompletionArgs;
           return StoryCompletionScreen(args: args);
         },
-
-        // 🔐 Parent-gated screens (gate applied at navigation points)
         '/parent-summary': (_) =>
             ParentSummaryScreen(progressRepository: widget.progressRepository),
-
         '/parent-voice': (_) => const ParentVoiceSettingsScreen(),
-
         '/create': (_) => CreateAdventureScreen(
               templateRepository: widget.adventureTemplateRepository,
               progressRepository: widget.progressRepository,
             ),
-
-        // Dev only
         '/firebase-test': (_) => const FirebaseTestScreen(),
       },
     );
   }
 }
 
-
-
-Future<void> ensureDevAuth() async {
-  if (!kDebugMode) return; // ⛔ never runs in release
-
-  const email = 'dev@suzyapp.local';
-  const password = 'DevPassword123!';
-
-  final auth = FirebaseAuth.instance;
-
-  // Already signed in as dev
-  if (auth.currentUser?.email == email) return;
-
-  try {
-    await auth.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-  } catch (_) {
-    // First time only
-    await auth.createUserWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-  }
-}
-
-// ================== NAV ARGS ==================
-
 class StoryReaderArgs {
   final String storyId;
   final int? startPageIndex;
-
-  StoryReaderArgs(
-    this.storyId, {
-    this.startPageIndex,
-  });
+  StoryReaderArgs(this.storyId, {this.startPageIndex});
 }

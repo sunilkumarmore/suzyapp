@@ -26,6 +26,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app needs to connect to local services for debugging and initialization.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Suzyapp needs microphone access to record a parent voice sample.</string>
 	<key>UIApplicationSceneManifest</key>
