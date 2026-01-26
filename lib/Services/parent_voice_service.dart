@@ -7,10 +7,12 @@ import 'package:http/http.dart' as http;
 class ParentVoiceService {
   final String? createEndpoint;
   final String? generateEndpoint;
+  final String? signedUrlEndpoint;
 
   ParentVoiceService({
     this.createEndpoint,
     this.generateEndpoint,
+    this.signedUrlEndpoint,
   });
 
   Future<String?> createVoiceFromSample({
@@ -78,9 +80,53 @@ class ParentVoiceService {
       body: jsonEncode(payload),
     );
 
-    if (resp.statusCode != 200) return null;
+    if (resp.statusCode == 202) return null;
+
+    if (resp.statusCode != 200) {
+      throw Exception('generateNarration failed: ${resp.statusCode} ${resp.body}');
+    }
+
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
-    return data['audioUrl'] as String?;
+
+    // Support both:
+    // { audioUrl: "..." }
+    // { status: "READY", audioUrl: "..." }
+    final url = data['audioUrl'];
+    if (url is String && url.trim().isNotEmpty) return url.trim();
+
+    // In case backend returns { status: "GENERATING" } with 200 (not expected, but safe)
+    final status = data['status'];
+    if (status is String && status.toUpperCase() == 'GENERATING') return null;
+
+    return null;
+  }
+
+  Future<String?> getSignedUrl({required String storagePath}) async {
+    if (signedUrlEndpoint == null || signedUrlEndpoint!.isEmpty) return null;
+
+    final user = FirebaseAuth.instance.currentUser;
+    final token = await user?.getIdToken();
+    if (user == null) return null;
+
+    final resp = await http.post(
+      Uri.parse(signedUrlEndpoint!),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'storagePath': storagePath,
+      }),
+    );
+
+    if (resp.statusCode != 200) {
+      throw Exception('getSignedUrl failed: ${resp.statusCode} ${resp.body}');
+    }
+
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    final url = data['audioUrl'];
+    if (url is String && url.trim().isNotEmpty) return url.trim();
+    return null;
   }
 }
 

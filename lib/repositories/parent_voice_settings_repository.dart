@@ -32,6 +32,8 @@ class ParentVoiceSettingsRepository {
     // Default values we want to guarantee exist (and with correct types).
     bool parentVoiceEnabled = false;
     String elevenVoiceId = '';
+    String narrationMode = 'narrator';
+    String narratorVoiceId = '';
     Map<String, dynamic> elevenlabsSettings = ParentVoiceSettings.defaults().elevenlabsSettings;
 
     if (snap.exists) {
@@ -52,6 +54,16 @@ class ParentVoiceSettingsRepository {
         elevenVoiceId = rawVoiceId;
       }
 
+      final rawMode = data['narrationMode'];
+      if (rawMode is String && rawMode.trim().isNotEmpty) {
+        narrationMode = rawMode.trim();
+      }
+
+      final rawNarratorId = data['narratorVoiceId'];
+      if (rawNarratorId is String) {
+        narratorVoiceId = rawNarratorId;
+      }
+
       final rawSettings = data['elevenlabsSettings'];
       if (rawSettings is Map) {
         elevenlabsSettings = Map<String, dynamic>.from(rawSettings);
@@ -69,6 +81,8 @@ class ParentVoiceSettingsRepository {
       {
         'parentVoiceEnabled': parentVoiceEnabled, // MUST be boolean
         'elevenVoiceId': elevenVoiceId,
+        'narrationMode': narrationMode,
+        'narratorVoiceId': narratorVoiceId,
         'elevenlabsSettings': elevenlabsSettings,
         'updatedAt': FieldValue.serverTimestamp(),
       },
