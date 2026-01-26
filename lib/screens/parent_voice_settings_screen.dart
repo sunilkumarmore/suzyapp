@@ -34,6 +34,7 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
   bool _localEnabled = false;
   bool _dirty = false;
   bool _saving = false;
+  bool _creatingVoice = false;
   String? _status;
   Map<String, dynamic> _elevenlabsSettings = ParentVoiceSettings.defaults().elevenlabsSettings;
 
@@ -125,34 +126,43 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
     required String mimeType,
     required void Function(String? status) setStatus,
   }) async {
-    setStatus('Creating voice…');
-    debugPrint(
-      'ParentVoice:createVoiceFromBytes bytes=${bytes.length} mime=$mimeType',
-    );
-    debugPrint('ParentVoice: upload bytes=${bytes.length} mime=$mimeType');
-    String? voiceId;
+    if (_creatingVoice) {
+      setStatus('Voice creation already in progress.');
+      return;
+    }
+    _creatingVoice = true;
     try {
-      voiceId = await _parentVoiceService.createVoiceFromSample(
-        audioBytes: bytes,
-        mimeType: mimeType,
-        name: 'Parent Voice',
+      setStatus('Creating voice?');
+      debugPrint(
+        'ParentVoice:createVoiceFromBytes bytes=${bytes.length} mime=$mimeType',
       );
-      debugPrint('ParentVoice: createVoiceFromSample returned=$voiceId');
-    } catch (e) {
-      debugPrint('ParentVoice: createVoiceFromSample error=$e');
-      setStatus('Voice creation failed.');
-      return;
-    }
+      debugPrint('ParentVoice: upload bytes=${bytes.length} mime=$mimeType');
+      String? voiceId;
+      try {
+        voiceId = await _parentVoiceService.createVoiceFromSample(
+          audioBytes: bytes,
+          mimeType: mimeType,
+          name: 'Parent Voice',
+        );
+        debugPrint('ParentVoice: createVoiceFromSample returned=$voiceId');
+      } catch (e) {
+        debugPrint('ParentVoice: createVoiceFromSample error=$e');
+        setStatus('Voice creation failed.');
+        return;
+      }
 
-    if (voiceId == null || voiceId.trim().isEmpty) {
-      debugPrint('ParentVoice: create failed (empty voiceId)');
-      setStatus('Voice creation failed.');
-      return;
-    }
+      if (voiceId == null || voiceId.trim().isEmpty) {
+        debugPrint('ParentVoice: create failed (empty voiceId)');
+        setStatus('Voice creation failed.');
+        return;
+      }
 
-    debugPrint('ParentVoice: created voiceId=$voiceId');
-    await _saveVoiceId(voiceId.trim());
-    setStatus('Voice created.');
+      debugPrint('ParentVoice: created voiceId=$voiceId');
+      await _saveVoiceId(voiceId.trim());
+      setStatus('Voice created.');
+    } finally {
+      _creatingVoice = false;
+    }
   }
 
   Future<void> _openRecordDialog() async {

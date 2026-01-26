@@ -2,7 +2,7 @@ import * as admin from "firebase-admin";
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { getAuth } from "firebase-admin/auth";
-import FormData from "form-data";
+import { ElevenLabsClient } from "elevenlabs";
 import fetch from "node-fetch";
 
 admin.initializeApp();
@@ -35,6 +35,13 @@ function normalizeLang(lang: any): "en" | "te" | null {
   const l = lang.trim().toLowerCase();
   if (l === "en" || l === "te") return l;
   return null;
+}
+
+function normalizeAudioMimeType(raw: any): string | null {
+  if (typeof raw !== "string") return null;
+  const base = raw.trim().toLowerCase().split(";")[0]?.trim();
+  if (!base) return null;
+  return base;
 }
 
 async function rateLimit(uid: string, key: string, windowMs: number, maxReq: number) {
@@ -242,18 +249,16 @@ export const parentVoiceCreate = onRequest(
         res.status(400).json({ error: "Missing audioBase64" });
         return;
       }
-      if (typeof mimeType !== "string" || mimeType.trim().length === 0) {
-        res.status(400).json({ error: "Missing mimeType" });
-        return;
-      }
-
       const elevenKey = ELEVENLABS_KEY.value();
       if (!elevenKey) {
         res.status(500).json({ error: "Server not configured (missing ELEVENLABS_KEY)" });
         return;
       }
 
-      const audioBuffer = Buffer.from(audioBase64, "base64");
+      const base64Payload = audioBase64.includes(",")
+        ? audioBase64.split(",").pop() || ""
+        : audioBase64;
+      const audioBuffer = Buffer.from(base64Payload, "base64");
       console.log("parentVoiceCreate audio bytes", audioBuffer.length);
       if (audioBuffer.length < 200) {
         res.status(400).json({ error: "Audio too short" });
@@ -264,32 +269,16 @@ export const parentVoiceCreate = onRequest(
         return;
       }
 
-      const form = new FormData();
-      form.append("name", typeof name === "string" && name.trim().length > 0 ? name.trim() : "Parent Voice");
-      form.append("files", audioBuffer, {
-        filename: "parent_sample.m4a",
-        contentType: mimeType.trim(),
+      const normalizedMimeType = normalizeAudioMimeType(mimeType) || "audio/mpeg";
+      const ext = normalizedMimeType.includes("/") ? normalizedMimeType.split("/")[1] : "bin";
+      const file = new File([audioBuffer], `sample.${ext}`, { type: normalizedMimeType });
+      const client = new ElevenLabsClient({ apiKey: elevenKey });
+      const voice = await client.voices.add({
+        name: typeof name === "string" && name.trim().length > 0 ? name.trim() : "Parent Voice",
+        files: [file],
+        remove_background_noise: true,
       });
-
-      const resp = await fetch("https://api.elevenlabs.io/v1/voices/add", {
-        method: "POST",
-        headers: {
-          "xi-api-key": elevenKey,
-          ...form.getHeaders(),
-        },
-        body: form as any,
-      });
-
-      if (!resp.ok) {
-        const detail = await resp.text();
-        console.error("parentVoiceCreate ElevenLabs error", resp.status, detail);
-        res.status(502).json({ error: "ElevenLabs voice create failed", detail });
-        return;
-      }
-
-      const data = (await resp.json()) as { voice_id?: string };
-      console.log("parentVoiceCreate ElevenLabs response", data);
-      const voiceId = typeof data.voice_id === "string" ? data.voice_id.trim() : "";
+      const voiceId = typeof voice.voice_id === "string" ? voice.voice_id.trim() : "";
       if (!voiceId) {
         res.status(502).json({ error: "Invalid response from ElevenLabs" });
         return;

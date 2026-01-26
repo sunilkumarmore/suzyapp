@@ -68,3 +68,4 @@ pubspec.lock
 *.bak
 pubspec.lock
 ios/Runner.xcodeproj/project.pbxproj
+pubspec.lock
