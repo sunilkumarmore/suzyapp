@@ -113,6 +113,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: AppSpacing.medium),
 
+              _BigTile(
+                title: 'Coloring',
+                subtitle: '',
+                color: AppColors.tileBlue,
+                gradient: const LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Color(0xFFFF8A65),
+                    Color(0xFFFFD54F),
+                    Color(0xFF9CCC65),
+                    Color(0xFF4DD0E1),
+                    Color(0xFF9575CD),
+                  ],
+                ),
+                icon: Icons.brush,
+                onTap: () => Navigator.pushNamed(context, '/coloring'),
+              ),
+
+              const SizedBox(height: AppSpacing.medium),
+
               if (_progress != null && _progress!.storyId != kMakeAStoryDemoId) ...[
                 _BigTile(
                   title: 'Continue',
@@ -163,6 +184,7 @@ class _BigTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final Color color;
+  final Gradient? gradient;
   final IconData icon;
   final VoidCallback onTap;
 
@@ -170,6 +192,7 @@ class _BigTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.color,
+    this.gradient,
     required this.icon,
     required this.onTap,
   });
@@ -193,6 +216,7 @@ class _BigTile extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: color,
+          gradient: gradient,
           borderRadius: BorderRadius.circular(AppRadius.large),
         ),
         child: Row(

@@ -3,6 +3,7 @@ import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { getAuth } from "firebase-admin/auth";
 import FormData from "form-data";
+import fetch from "node-fetch";
 
 admin.initializeApp();
 

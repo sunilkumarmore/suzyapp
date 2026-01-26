@@ -1,0 +1,74 @@
+{
+  "pages": [
+    {
+      "id": "space_rocket_01",
+      "title": "Rocket",
+      "ageBand": "4-7",
+      "imageAsset": "images/coloring/space_alien_outline.png",
+      "maskAsset": "images/coloring/space_alien_mask.png"
+    },
+    {
+      "id": "space_planet_02",
+      "title": "Planet",
+      "ageBand": "4-7",
+      "imageAsset": "images/coloring/space_planet_mask.png",
+      "maskAsset": "images/coloring/space_planet_mask.png"
+    },
+    {
+      "id": "space_astronaut_03",
+      "title": "Astronaut",
+      "ageBand": "4-7",
+      "imageAsset": "images/coloring/rocket.png",
+      "maskAsset": "images/coloring/rocket_mask.png"
+    },
+    {
+      "id": "jungle_lion_01",
+      "title": "Lion",
+      "ageBand": "4-7",
+      "imageAsset": "images/coloring/jungle_lion_01.png",
+      "maskAsset": "images/coloring/jungle_lion_01_mask.png"
+    },
+    {
+      "id": "jungle_elephant_02",
+      "title": "Elephant",
+      "ageBand": "4-7",
+      "imageAsset": "images/coloring/jungle_elephant_02.png",
+      "maskAsset": "images/coloring/jungle_elephant_02_mask.png"
+    },
+    {
+      "id": "ocean_whale_01",
+      "title": "Whale",
+      "ageBand": "4-7",
+      "imageAsset": "images/coloring/ocean_whale_01.png",
+      "maskAsset": "images/coloring/ocean_whale_01_mask.png"
+    },
+    {
+      "id": "ocean_turtle_02",
+      "title": "Turtle",
+      "ageBand": "4-7",
+      "imageAsset": "images/coloring/ocean_turtle_02.png",
+      "maskAsset": "images/coloring/ocean_turtle_02_mask.png"
+    },
+    {
+      "id": "farm_tractor_01",
+      "title": "Tractor",
+      "ageBand": "4-7",
+      "imageAsset": "images/coloring/farm_tractor_01.png",
+      "maskAsset": "images/coloring/farm_tractor_01_mask.png"
+    },
+    {
+      "id": "park_balloon_01",
+      "title": "Balloon",
+      "ageBand": "4-7",
+      "imageAsset": "images/coloring/park_balloon_01.png",
+      "maskAsset": "images/coloring/park_balloon_01_mask.png"
+    },
+    {
+      "id": "dino_trex_01",
+      "title": "T-Rex",
+      "ageBand": "4-7",
+      "imageAsset": "images/coloring/dino_trex_01.png",
+      "maskAsset": "images/coloring/dino_trex_01_mask.png"
+    }
+  ]
+}

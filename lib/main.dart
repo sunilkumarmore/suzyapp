@@ -22,6 +22,8 @@ import 'repositories/adventure_template_repository.dart';
 import 'repositories/composite_adventure_template_repository.dart';
 import 'repositories/firestore_adventure_template_repository.dart';
 import 'repositories/parent_voice_settings_repository.dart';
+import 'repositories/coloring_repository.dart';
+import 'repositories/asset_coloring_repository.dart';
 
 // Screens
 import 'screens/home_screen.dart';
@@ -33,9 +35,12 @@ import 'screens/parent_voice_settings_screen.dart';
 import 'screens/create_adventure_screen.dart';
 import 'screens/firebase_test_screen.dart';
 import 'screens/privacy_policy_screen.dart';
+import 'screens/coloring_library_screen.dart';
+import 'screens/coloring_canvas_screen.dart';
 
 // Services
 import 'services/parent_gate_service.dart';
+
 
 Future<void> main() async {
   // 1. Initialize Flutter Bindings
@@ -100,12 +105,15 @@ Future<void> main() async {
       cloud: FirestoreProgressRepository(),
     );
 
+    final ColoringRepository coloringRepo = AssetColoringRepository();
+
     // 7. Launch the actual App
     runApp(
       SuzyApp(
         storyRepository: storyRepo,
         progressRepository: progressRepo,
         adventureTemplateRepository: templateRepo,
+        coloringRepository: coloringRepo,
       ),
     );
   } catch (e) {
@@ -139,12 +147,14 @@ class SuzyApp extends StatefulWidget {
   final StoryRepository storyRepository;
   final ProgressRepository progressRepository;
   final AdventureTemplateRepository adventureTemplateRepository;
+  final ColoringRepository coloringRepository;
 
   const SuzyApp({
     super.key,
     required this.storyRepository,
     required this.progressRepository,
     required this.adventureTemplateRepository,
+    required this.coloringRepository,
   });
 
   @override
@@ -235,6 +245,16 @@ class _SuzyAppState extends State<SuzyApp> with WidgetsBindingObserver {
               templateRepository: widget.adventureTemplateRepository,
               progressRepository: widget.progressRepository,
             ),
+        '/coloring': (_) => ColoringLibraryScreen(
+              coloringRepository: widget.coloringRepository,
+            ),
+        '/coloring-canvas': (ctx) {
+          final args = ModalRoute.of(ctx)!.settings.arguments as ColoringCanvasArgs;
+          return ColoringCanvasScreen(
+            pages: args.pages,
+            initialIndex: args.initialIndex,
+          );
+        },
         '/firebase-test': (_) => const FirebaseTestScreen(),
       },
     );

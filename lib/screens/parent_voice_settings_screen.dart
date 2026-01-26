@@ -126,12 +126,23 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
     required void Function(String? status) setStatus,
   }) async {
     setStatus('Creating voice…');
-    debugPrint('ParentVoice: upload bytes=${bytes.length} mime=$mimeType');
-    final voiceId = await _parentVoiceService.createVoiceFromSample(
-      audioBytes: bytes,
-      mimeType: mimeType,
-      name: 'Parent Voice',
+    debugPrint(
+      'ParentVoice:createVoiceFromBytes bytes=${bytes.length} mime=$mimeType',
     );
+    debugPrint('ParentVoice: upload bytes=${bytes.length} mime=$mimeType');
+    String? voiceId;
+    try {
+      voiceId = await _parentVoiceService.createVoiceFromSample(
+        audioBytes: bytes,
+        mimeType: mimeType,
+        name: 'Parent Voice',
+      );
+      debugPrint('ParentVoice: createVoiceFromSample returned=$voiceId');
+    } catch (e) {
+      debugPrint('ParentVoice: createVoiceFromSample error=$e');
+      setStatus('Voice creation failed.');
+      return;
+    }
 
     if (voiceId == null || voiceId.trim().isEmpty) {
       debugPrint('ParentVoice: create failed (empty voiceId)');
@@ -150,6 +161,7 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
       return;
     }
 
+    debugPrint('ParentVoice: openRecordDialog (mobile)');
     bool started = false;
     bool isRecording = false;
     int elapsed = 0;
@@ -158,6 +170,7 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
     Timer? timer;
 
     Future<void> stopRecording(StateSetter setState, {bool autoStop = false}) async {
+      debugPrint('ParentVoice: stopRecording(autoStop=$autoStop) isRecording=$isRecording');
       if (isRecording) {
         try {
           await _recorder.stop();
@@ -174,11 +187,14 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
       });
 
       if (localPath != null) {
+        debugPrint('ParentVoice: localPath=$localPath');
         final bytes = await readFileBytes(localPath!);
         if (bytes == null) {
+          debugPrint('ParentVoice: readFileBytes returned null');
           setState(() => localStatus = 'Recording saved, but file read failed.');
           return;
         }
+        debugPrint('ParentVoice: bytes read=${bytes.length}');
         await _createVoiceFromBytes(
           bytes: bytes,
           mimeType: 'audio/m4a',
@@ -188,8 +204,10 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
     }
 
     Future<void> startRecording(StateSetter setState) async {
+      debugPrint('ParentVoice: startRecording requested');
       try {
         final allowed = await _recorder.hasPermission();
+        debugPrint('ParentVoice: mic permission=$allowed');
         if (!allowed) {
           setState(() => localStatus = 'Microphone permission denied.');
           return;
@@ -204,6 +222,7 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
           bitRate: 128000,
           samplingRate: 44100,
         );
+        debugPrint('ParentVoice: recorder started path=$localPath');
 
         setState(() {
           isRecording = true;
@@ -308,6 +327,7 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
   }
 
   Future<void> _openWebRecordDialog() async {
+    debugPrint('ParentVoice: openWebRecordDialog');
     bool started = false;
     bool isRecording = false;
     int elapsed = 0;
@@ -316,10 +336,12 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
     Timer? timer;
 
     Future<void> stopRecording(StateSetter setState, {bool autoStop = false}) async {
+      debugPrint('ParentVoice(web): stopRecording(autoStop=$autoStop) isRecording=$isRecording');
       if (isRecording) {
         try {
           webRecording = await _webRecorder.stop();
         } catch (e) {
+          debugPrint('ParentVoice(web): stop error=$e');
           localStatus = 'Recording failed: $e';
         }
       }
@@ -335,17 +357,24 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
 
       final rec = webRecording;
       if (rec != null) {
+        debugPrint(
+          'ParentVoice(web): bytes=${rec.bytes.length} mime=${rec.mimeType} url=${rec.downloadUrl}',
+        );
         await _createVoiceFromBytes(
           bytes: rec.bytes,
           mimeType: rec.mimeType,
           setStatus: (s) => setState(() => localStatus = s),
         );
+      } else {
+        debugPrint('ParentVoice(web): no recording returned');
       }
     }
 
     Future<void> startRecording(StateSetter setState) async {
+      debugPrint('ParentVoice(web): startRecording requested');
       try {
         await _webRecorder.start();
+        debugPrint('ParentVoice(web): recorder started');
         setState(() {
           isRecording = true;
           elapsed = 0;
@@ -363,6 +392,7 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
           setState(() {});
         });
       } catch (e) {
+        debugPrint('ParentVoice(web): start error=$e');
         setState(() => localStatus = 'Microphone permission denied.');
       }
     }
@@ -484,7 +514,7 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
             elevation: 0,
           ),
           body: SafeArea(
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(AppSpacing.large),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
