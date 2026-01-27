@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SuzyApp Coloring SVG — Elephant (clean, instant recognition, no messy overlaps)
+     Regions: region_body, region_head, region_ear_left, region_ear_right, region_trunk, region_belly, region_feet
+     Outline: outline (render on top)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- ===== COLOR REGIONS ===== -->
+  <g id="regions" fill="#FFFFFF" stroke="none">
+    <!-- BODY -->
+    <path id="region_body" d="
+      M 360 720
+      C 320 650, 335 560, 410 520
+      C 470 488, 560 490, 625 525
+      C 700 565, 735 645, 705 720
+      C 675 795, 600 845, 520 845
+      C 445 845, 390 800, 360 720
+      Z
+    "/>
+
+    <!-- HEAD (separate from body so it reads clearly) -->
+    <path id="region_head" d="
+      M 430 520
+      C 420 445, 475 385, 555 375
+      C 650 365, 735 435, 735 525
+      C 735 615, 660 675, 575 665
+      C 495 655, 440 610, 430 520
+      Z
+    "/>
+
+    <!-- BIG EARS (drawn behind head, but as separate tappable regions) -->
+    <path id="region_ear_left" d="
+      M 395 520
+      C 310 520, 245 585, 255 665
+      C 265 745, 350 785, 425 745
+      C 470 720, 485 665, 475 615
+      C 463 560, 435 520, 395 520
+      Z
+    "/>
+
+    <path id="region_ear_right" d="
+      M 745 525
+      C 825 535, 885 605, 875 685
+      C 865 765, 785 805, 710 765
+      C 660 735, 645 675, 660 625
+      C 675 575, 705 520, 745 525
+      Z
+    "/>
+
+    <!-- TRUNK (long, obvious, not tangled) -->
+    <path id="region_trunk" d="
+      M 665 560
+      C 720 585, 735 635, 705 675
+      C 685 700, 660 720, 655 750
+      C 650 785, 680 810, 720 800
+      C 760 790, 780 755, 770 720
+      C 760 685, 735 670, 745 640
+      C 760 600, 735 560, 695 545
+      C 675 538, 660 545, 665 560
+      Z
+    "/>
+
+    <!-- BELLY -->
+    <path id="region_belly" d="
+      M 450 760
+      C 430 730, 430 690, 450 660
+      C 480 615, 550 600, 605 625
+      C 655 648, 675 705, 650 745
+      C 625 785, 560 800, 505 790
+      C 480 785, 465 775, 450 760
+      Z
+    "/>
+
+    <!-- FEET (single region for toddlers) -->
+    <path id="region_feet" d="
+      M 405 820
+      C 390 860, 420 890, 465 885
+      C 510 880, 535 850, 520 815
+      C 500 770, 425 775, 405 820
+      Z
+
+      M 575 815
+      C 560 855, 590 885, 635 880
+      C 680 875, 705 845, 690 810
+      C 670 765, 595 770, 575 815
+      Z
+    "/>
+  </g>
+
+  <!-- ===== OUTLINE (ON TOP) ===== -->
+  <g id="outline" fill="none" stroke="#000000" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Ear outlines (draw first, behind head visually, but stroke is on top anyway) -->
+    <path d="
+      M 395 520
+      C 310 520, 245 585, 255 665
+      C 265 745, 350 785, 425 745
+      C 470 720, 485 665, 475 615
+      C 463 560, 435 520, 395 520
+      Z
+    "/>
+    <path d="
+      M 745 525
+      C 825 535, 885 605, 875 685
+      C 865 765, 785 805, 710 765
+      C 660 735, 645 675, 660 625
+      C 675 575, 705 520, 745 525
+      Z
+    "/>
+
+    <!-- Head outline -->
+    <path d="
+      M 430 520
+      C 420 445, 475 385, 555 375
+      C 650 365, 735 435, 735 525
+      C 735 615, 660 675, 575 665
+      C 495 655, 440 610, 430 520
+      Z
+    "/>
+
+    <!-- Body outline -->
+    <path d="
+      M 360 720
+      C 320 650, 335 560, 410 520
+      C 470 488, 560 490, 625 525
+      C 700 565, 735 645, 705 720
+      C 675 795, 600 845, 520 845
+      C 445 845, 390 800, 360 720
+      Z
+    "/>
+
+    <!-- Trunk outline -->
+    <path d="
+      M 665 560
+      C 720 585, 735 635, 705 675
+      C 685 700, 660 720, 655 750
+      C 650 785, 680 810, 720 800
+      C 760 790, 780 755, 770 720
+      C 760 685, 735 670, 745 640
+      C 760 600, 735 560, 695 545
+      C 675 538, 660 545, 665 560
+      Z
+    "/>
+
+    <!-- Belly outline -->
+    <path d="
+      M 450 760
+      C 430 730, 430 690, 450 660
+      C 480 615, 550 600, 605 625
+      C 655 648, 675 705, 650 745
+      C 625 785, 560 800, 505 790
+      C 480 785, 465 775, 450 760
+      Z
+    "/>
+
+    <!-- Feet outlines -->
+    <path d="
+      M 405 820
+      C 390 860, 420 890, 465 885
+      C 510 880, 535 850, 520 815
+      C 500 770, 425 775, 405 820
+      Z
+    "/>
+    <path d="
+      M 575 815
+      C 560 855, 590 885, 635 880
+      C 680 875, 705 845, 690 810
+      C 670 765, 595 770, 575 815
+      Z
+    "/>
+
+    <!-- Face (super minimal, won’t clutter) -->
+    <circle cx="585" cy="510" r="14"/>
+    <circle cx="635" cy="512" r="14"/>
+    <path d="M 595 555 C 615 570, 635 570, 655 555"/>
+  </g>
+</svg>

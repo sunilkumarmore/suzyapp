@@ -1,0 +1,19 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <path id="part_tail" d="M150,140 Q180,140 180,110 Q180,80 160,80" 
+        fill="white" stroke="transparent" stroke-width="20" />
+  
+  <circle id="part_ear_left" cx="55" cy="80" r="20" fill="white" />
+  <circle id="part_ear_right" cx="145" cy="80" r="20" fill="white" />
+  
+  <ellipse id="part_body" cx="100" cy="130" r="45" ry="55" fill="white" />
+  
+  <circle id="part_head" cx="100" cy="85" r="45" fill="white" />
+  
+  <ellipse id="part_belly" cx="100" cy="140" r="25" ry="35" fill="white" />
+
+  <g id="outlines" style="pointer-events: none;" fill="none" stroke="black" stroke-width="4" stroke-linecap="round">
+    <path d="M150,140 Q180,140 180,110 Q180,80 160,80" /> <circle cx="55" cy="80" r="20" /> <circle cx="145" cy="80" r="20" /> <ellipse cx="100" cy="130" r="45" ry="55" /> <circle cx="100" cy="85" r="45" /> <ellipse cx="100" cy="140" r="25" ry="35" stroke-width="2" /> <circle cx="85" cy="75" r="4" fill="black" stroke="none"/>
+    <circle cx="115" cy="75" r="4" fill="black" stroke="none"/>
+    <path d="M85,100 Q100,115 115,100" stroke-width="3" />
+  </g>
+</svg>

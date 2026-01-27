@@ -214,8 +214,8 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
       await _sfxPlayer.setVolume(0.18); // very soft
       await _sfxPlayer.seek(Duration.zero);
       await _sfxPlayer.play();
-    } catch (_) {
-      // ignore if missing/failed
+    } catch (e) {
+      debugPrint('Page flip sfx error: $e');
     }
   }
 
@@ -879,20 +879,32 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
               _ProgressRow(
                 index: isCreatedStory ? _pathPos : _pageIndex,
                 total: isCreatedStory ? _path.length : story.pages.length,
-                onPrev: isCreatedStory && _pathPos > 0
-                    ? () => _pageController.previousPage(
-                          duration: const Duration(milliseconds: 260),
-                          curve: Curves.easeOut,
-                        )
-                    : null,
-                onNext: isCreatedStory && _pathPos < _path.length - 1
-                    ? () => _pageController.nextPage(
-                          duration: const Duration(milliseconds: 260),
-                          curve: Curves.easeOut,
-                        )
-                    : (isCreatedStory && isLastPage
+                onPrev: isCreatedStory
+                    ? (_pathPos > 0
+                        ? () => _pageController.previousPage(
+                              duration: const Duration(milliseconds: 260),
+                              curve: Curves.easeOut,
+                            )
+                        : null)
+                    : (_pageIndex > 0
+                        ? () => _pageController.previousPage(
+                              duration: const Duration(milliseconds: 260),
+                              curve: Curves.easeOut,
+                            )
+                        : null),
+                onNext: isCreatedStory
+                    ? (_pathPos < _path.length - 1
+                        ? () => _pageController.nextPage(
+                              duration: const Duration(milliseconds: 260),
+                              curve: Curves.easeOut,
+                            )
+                        : (isLastPage ? () => _showCompletion(story) : null))
+                    : (isLastPage
                         ? () => _showCompletion(story)
-                        : (!isCreatedStory && isLastPage ? () => _showCompletion(story) : null)),
+                        : () => _pageController.nextPage(
+                              duration: const Duration(milliseconds: 260),
+                              curve: Curves.easeOut,
+                            )),
               ),
 
             if (_isPlayingAudio || _isSpeakingTts) ...[
@@ -981,7 +993,11 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
                           picked: choice,
                         );
                       } else {
-                        _setPage(choice.nextPageIndex);
+                        _pageController.animateToPage(
+                          choice.nextPageIndex,
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeOut,
+                        );
                       }
                     },
                   ),
@@ -992,18 +1008,32 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
                   child: _ProgressRow(
                     index: isCreatedStory ? _pathPos : _pageIndex,
                     total: isCreatedStory ? _path.length : story.pages.length,
-                    onPrev: isCreatedStory && _pathPos > 0
-                        ? () => _pageController.previousPage(
-                              duration: const Duration(milliseconds: 260),
-                              curve: Curves.easeOut,
-                            )
-                        : null,
-                    onNext: isCreatedStory && _pathPos < _path.length - 1
-                        ? () => _pageController.nextPage(
-                              duration: const Duration(milliseconds: 260),
-                              curve: Curves.easeOut,
-                            )
-                        : (isCreatedStory && isLastPage ? () => _showCompletion(story) : null),
+                    onPrev: isCreatedStory
+                        ? (_pathPos > 0
+                            ? () => _pageController.previousPage(
+                                  duration: const Duration(milliseconds: 260),
+                                  curve: Curves.easeOut,
+                                )
+                            : null)
+                        : (_pageIndex > 0
+                            ? () => _pageController.previousPage(
+                                  duration: const Duration(milliseconds: 260),
+                                  curve: Curves.easeOut,
+                                )
+                            : null),
+                    onNext: isCreatedStory
+                        ? (_pathPos < _path.length - 1
+                            ? () => _pageController.nextPage(
+                                  duration: const Duration(milliseconds: 260),
+                                  curve: Curves.easeOut,
+                                )
+                            : (isCreatedStory && isLastPage ? () => _showCompletion(story) : null))
+                        : (isLastPage
+                            ? () => _showCompletion(story)
+                            : () => _pageController.nextPage(
+                                  duration: const Duration(milliseconds: 260),
+                                  curve: Curves.easeOut,
+                                )),
                   ),
                 ),
               ],
@@ -1087,18 +1117,49 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
       itemBuilder: (_, pathPos) {
         final real = _path[pathPos];
         final page = story.pages[real];
-        return Padding(
-          padding: const EdgeInsets.all(AppSpacing.large),
-          child: Stack(
-            children: [
-              _buildStoryPageContent(
-                story: story,
-                page: page,
-                realIndex: real,
-                isCreatedStory: true,
-              ),
-              _SwipeHintOverlay(show: !_swipeHintSeen && _pathPos == 0),
-            ],
+        return _CurlPage(
+          controller: _pageController,
+          index: pathPos,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.large),
+            child: Stack(
+              children: [
+                _buildStoryPageContent(
+                  story: story,
+                  page: page,
+                  realIndex: real,
+                  isCreatedStory: true,
+                ),
+                _SwipeHintOverlay(show: !_swipeHintSeen && _pathPos == 0),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStandardStoryPager(Story story) {
+    return PageView.builder(
+      controller: _pageController,
+      itemCount: story.pages.length,
+      onPageChanged: (pos) async {
+        _markSwiped();
+        await _setPage(pos);
+      },
+      itemBuilder: (_, idx) {
+        final page = story.pages[idx];
+        return _CurlPage(
+          controller: _pageController,
+          index: idx,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.large),
+            child: _buildStoryPageContent(
+              story: story,
+              page: page,
+              realIndex: idx,
+              isCreatedStory: false,
+            ),
           ),
         );
       },
@@ -1165,7 +1226,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
             _pageController = PageController(initialPage: 0);
             _pageControllerReady = true;
           } else if (!isCreatedStory && !_pageControllerReady) {
-            _pageController = PageController(initialPage: 0);
+            _pageController = PageController(initialPage: _pageIndex);
             _pageControllerReady = true;
           }
 
@@ -1182,37 +1243,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
 
           return Stack(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(AppSpacing.large),
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onHorizontalDragEnd: (details) {
-                    final vx = details.primaryVelocity ?? 0;
-
-                    if (vx < -250) {
-                      _markSwiped();
-                      if (_pageIndex < story.pages.length - 1) {
-                        _setPage(_pageIndex + 1);
-                      } else {
-                        _showCompletion(story);
-                      }
-                    }
-
-                    if (vx > 250) {
-                      _markSwiped();
-                      if (_pageIndex > 0) {
-                        _setPage(_pageIndex - 1);
-                      }
-                    }
-                  },
-                  child: _buildStoryPageContent(
-                    story: story,
-                    page: page,
-                    realIndex: realIndex,
-                    isCreatedStory: false,
-                  ),
-                ),
-              ),
+              _buildStandardStoryPager(story),
               if (_showSwipeHint && safeIndex == 0)
                 Positioned(
                   left: 0,
@@ -1226,6 +1257,65 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+class _CurlPage extends StatelessWidget {
+  const _CurlPage({
+    required this.controller,
+    required this.index,
+    required this.child,
+  });
+
+  final PageController controller;
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final page = controller.hasClients
+            ? (controller.page ?? controller.initialPage.toDouble())
+            : controller.initialPage.toDouble();
+        final delta = (page - index).clamp(-1.0, 1.0);
+        final isTurningLeft = delta > 0;
+        final rotation = -delta * 0.35;
+        final shadowOpacity = (delta.abs() * 0.35).clamp(0.0, 0.35);
+
+        return ClipRect(
+          child: Transform(
+            alignment: isTurningLeft ? Alignment.centerLeft : Alignment.centerRight,
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.001)
+              ..rotateY(rotation),
+            child: Stack(
+              children: [
+                child,
+                if (shadowOpacity > 0)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: isTurningLeft ? Alignment.centerLeft : Alignment.centerRight,
+                            end: isTurningLeft ? Alignment.centerRight : Alignment.centerLeft,
+                            colors: [
+                              Colors.black.withOpacity(shadowOpacity * 0.6),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

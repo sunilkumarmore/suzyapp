@@ -75,8 +75,11 @@ Future<void> main() async {
     if (kIsWeb) {
       await configureAuthPersistenceForWeb();
     }
-    await ensureAnonAuth();
-   // await ensureDevAuth();
+    if (kDebugMode) {
+      await ensureDevAuth();
+    } else {
+      await ensureAnonAuth();
+    }
 
     // 5. Verify Auth State & Setup Defaults
     final user = FirebaseAuth.instance.currentUser;

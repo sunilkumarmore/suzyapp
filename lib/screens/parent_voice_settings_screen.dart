@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../design_system/app_colors.dart';
 import '../design_system/app_radius.dart';
@@ -25,6 +26,8 @@ class ParentVoiceSettingsScreen extends StatefulWidget {
 }
 
 class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
+  static const _kParentVoiceTourSeen = 'parent_voice_tour_seen_v1';
+
   final _repo = ParentVoiceSettingsRepository();
   final _voiceIdController = TextEditingController();
   final Record _recorder = Record();
@@ -35,6 +38,7 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
   bool _dirty = false;
   bool _saving = false;
   bool _creatingVoice = false;
+  bool _showParentTour = false;
   String? _status;
   Map<String, dynamic> _elevenlabsSettings = ParentVoiceSettings.defaults().elevenlabsSettings;
 
@@ -47,6 +51,21 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
       createEndpoint: 'https://us-central1-suzyapp.cloudfunctions.net/parentVoiceCreate',
       generateEndpoint: 'https://us-central1-suzyapp.cloudfunctions.net/generateNarration',
     );
+    _loadTourFlag();
+  }
+
+  Future<void> _loadTourFlag() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool(_kParentVoiceTourSeen) ?? false;
+    if (!mounted) return;
+    setState(() => _showParentTour = !seen);
+  }
+
+  Future<void> _dismissTour() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kParentVoiceTourSeen, true);
+    if (!mounted) return;
+    setState(() => _showParentTour = false);
   }
 
   @override
@@ -523,12 +542,14 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
             backgroundColor: AppColors.background,
             elevation: 0,
           ),
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.large),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+          body: Stack(
+            children: [
+              SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(AppSpacing.large),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                   _SectionCard(
                     title: 'Voice',
                     child: Column(
@@ -632,9 +653,80 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
                       ),
                     ),
                   ],
-                ],
+                    ],
+                  ),
+                ),
               ),
-            ),
+              if (_showParentTour)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black.withOpacity(0.55),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: AppSpacing.large),
+                          padding: const EdgeInsets.all(AppSpacing.large),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(AppRadius.large),
+                            border: Border.all(color: AppColors.outline),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: AppColors.shadow,
+                                blurRadius: 18,
+                                offset: Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Parent Voice',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: AppSpacing.small),
+                              const Text(
+                                'Record a short sample so your child can hear your voice. ',
+                              ),
+                              const SizedBox(height: AppSpacing.small),
+                              const Text(
+                                'Tip: Use a quiet room and speak naturally for one minute.',
+                                style: TextStyle(color: AppColors.textSecondary),
+                              ),
+                              const SizedBox(height: AppSpacing.medium),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: _dismissTour,
+                                      child: const Text('Got it'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.small),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () async {
+                                        await _dismissTour();
+                                        if (mounted) {
+                                          await _openRecordDialog();
+                                        }
+                                      },
+                                      child: const Text('Record now'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         );
       },

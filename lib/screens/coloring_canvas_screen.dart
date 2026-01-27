@@ -6,6 +6,9 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:just_audio/just_audio.dart';
+import 'package:path_drawing/path_drawing.dart';
+import 'package:xml/xml.dart';
 
 import '../design_system/app_colors.dart';
 import '../design_system/app_radius.dart';
@@ -44,9 +47,16 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
   Uint8List? _maskPixels;
   Uint8List? _fillPixels;
   Size _imageSize = Size.zero;
+  bool _isSvg = false;
+  Size _svgSize = Size.zero;
+  List<_SvgRegion> _svgRegions = const [];
+  List<_SvgOutline> _svgOutlines = const [];
+  Map<String, Color> _svgRegionColors = {};
+  final List<Map<String, Color>> _svgUndoStack = [];
 
   final List<Uint8List> _undoStack = [];
   bool _isFilling = false;
+  final AudioPlayer _sfxPlayer = AudioPlayer();
 
   final List<Color> _palette = [
     const Color(0xFFE35A55),
@@ -79,6 +89,7 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
   void dispose() {
     _pageController.dispose();
     _sparkleController.dispose();
+    _sfxPlayer.dispose();
     super.dispose();
   }
 
@@ -86,6 +97,11 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
     final page = widget.pages[_index];
     final outlinePath = AssetPath.normalize(page.imageAsset);
     final maskPath = AssetPath.normalize(page.maskAsset);
+
+    if (outlinePath.toLowerCase().endsWith('.svg')) {
+      await _loadSvgAssets(outlinePath);
+      return;
+    }
 
     ui.Image? outline;
     ui.Image? mask;
@@ -100,10 +116,10 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
       mask = null;
     }
 
-    final Size size = outline != null
-        ? Size(outline.width.toDouble(), outline.height.toDouble())
-        : (mask != null
-            ? Size(mask.width.toDouble(), mask.height.toDouble())
+    final Size size = mask != null
+        ? Size(mask.width.toDouble(), mask.height.toDouble())
+        : (outline != null
+            ? Size(outline.width.toDouble(), outline.height.toDouble())
             : const Size(1, 1));
     final maskPixels = mask != null
         ? await _rgbaBytes(mask)
@@ -111,13 +127,55 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
 
     if (!mounted) return;
     setState(() {
+      _isSvg = false;
       _outlineImage = outline;
       _imageSize = size;
       _maskPixels = maskPixels;
       _fillPixels = Uint8List(maskPixels.length);
       _undoStack.clear();
+      _svgSize = Size.zero;
+      _svgRegions = const [];
+      _svgOutlines = const [];
+      _svgRegionColors = {};
+      _svgUndoStack.clear();
     });
     await _refreshFillImage();
+  }
+
+  Future<void> _loadSvgAssets(String svgPath) async {
+    try {
+      final raw = await rootBundle.loadString(svgPath);
+      final doc = XmlDocument.parse(raw);
+      final svg = doc.findAllElements('svg').first;
+
+      final svgSize = _parseSvgSize(svg);
+      final regions = _parseSvgRegions(svg);
+      final outlines = _parseSvgOutlines(svg);
+
+      if (!mounted) return;
+      setState(() {
+        _isSvg = true;
+        _svgSize = svgSize;
+        _svgRegions = regions;
+        _svgOutlines = outlines;
+        _svgRegionColors = {};
+        _svgUndoStack.clear();
+        _outlineImage = null;
+        _fillImage = null;
+        _maskPixels = null;
+        _fillPixels = null;
+        _imageSize = svgSize;
+        _undoStack.clear();
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Failed to load SVG: $e');
+      }
+      if (!mounted) return;
+      setState(() {
+        _isSvg = false;
+      });
+    }
   }
 
   Future<ui.Image> _loadUiImage(String assetPath) async {
@@ -183,6 +241,10 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
 
   Future<void> _handleTap(Offset localPos, Rect rect) async {
     if (_isFilling) return;
+    if (_isSvg) {
+      _handleSvgTap(localPos, rect);
+      return;
+    }
     if (_maskPixels == null || _fillPixels == null) return;
     if (!rect.contains(localPos)) return;
 
@@ -194,11 +256,19 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
         .toInt();
     final idx = (y * _imageSize.width.toInt() + x) * 4;
     final mask = _maskPixels!;
+    if (idx < 0 || idx + 3 >= mask.length) return;
     final r = mask[idx];
     final g = mask[idx + 1];
     final b = mask[idx + 2];
+    final a = mask[idx + 3];
 
-    if (r + g + b < 20) return;
+    if (kDebugMode) {
+      debugPrint(
+        'fill tap: x=$x y=$y idx=$idx maskLen=${mask.length} rgba=($r,$g,$b,$a)',
+      );
+    }
+
+    if (a < 10) return;
 
     _undoStack.add(Uint8List.fromList(_fillPixels!));
     _isFilling = true;
@@ -210,8 +280,11 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
       'width': _imageSize.width.toInt(),
       'height': _imageSize.height.toInt(),
       'target': [r, g, b],
+      'targetAlpha': a,
+      // Be strict at edges to avoid coloring outside soft/dirty masks.
+      'minAlpha': 200,
       'color': [color.red, color.green, color.blue],
-      'tol': 8,
+      'tol': 0,
     });
 
     if (!mounted) return;
@@ -221,27 +294,91 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
     });
     await _refreshFillImage();
     _showSparkle();
-    _playWow();
+    _playFillSfx();
     _isFilling = false;
+  }
+
+  void _handleSvgTap(Offset localPos, Rect rect) {
+    if (!_isSvg) return;
+    if (!rect.contains(localPos)) return;
+    if (_svgRegions.isEmpty || _svgSize.width <= 0 || _svgSize.height <= 0) {
+      return;
+    }
+
+    final svgPoint = _mapToSvg(localPos, rect, _svgSize);
+    if (svgPoint == null) return;
+
+    _SvgRegion? hit;
+    for (final r in _svgRegions) {
+      if (r.path.contains(svgPoint)) {
+        hit = r;
+        break;
+      }
+    }
+    if (hit == null) return;
+
+    _svgUndoStack.add(Map<String, Color>.from(_svgRegionColors));
+    final color = _palette[_selectedColorIndex];
+    setState(() {
+      _svgRegionColors[hit!.id] = color;
+      _sparkleOffset = localPos;
+    });
+    _showSparkle();
+    _playFillSfx();
+  }
+
+  Offset? _mapToSvg(Offset localPos, Rect rect, Size svgSize) {
+    if (rect.width <= 0 ||
+        rect.height <= 0 ||
+        svgSize.width <= 0 ||
+        svgSize.height <= 0) {
+      return null;
+    }
+    final dx = ((localPos.dx - rect.left) / rect.width)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    final dy = ((localPos.dy - rect.top) / rect.height)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    return Offset(dx * svgSize.width, dy * svgSize.height);
   }
 
   void _showSparkle() {
     _sparkleController.forward(from: 0);
   }
 
-  void _playWow() {
-    if (kDebugMode) {
-      debugPrint('playWow');
+  Future<void> _playFillSfx() async {
+    try {
+      await _sfxPlayer.setAsset('assets/audio/sfx/color_fill.mp3');
+      await _sfxPlayer.setVolume(0.2);
+      await _sfxPlayer.seek(Duration.zero);
+      await _sfxPlayer.play();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('color_fill sfx error: $e');
+      }
     }
   }
 
   void _undo() {
+    if (_isSvg) {
+      if (_svgUndoStack.isEmpty) return;
+      setState(() => _svgRegionColors = _svgUndoStack.removeLast());
+      return;
+    }
     if (_undoStack.isEmpty) return;
     setState(() => _fillPixels = _undoStack.removeLast());
     _refreshFillImage();
   }
 
   void _reset() {
+    if (_isSvg) {
+      setState(() {
+        _svgRegionColors = {};
+        _svgUndoStack.clear();
+      });
+      return;
+    }
     if (_fillPixels == null) return;
     setState(() {
       _fillPixels = Uint8List(_fillPixels!.length);
@@ -281,7 +418,8 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
                     padding: const EdgeInsets.all(AppSpacing.large),
                     child: LayoutBuilder(
                       builder: (context, c) {
-                        final rect = _containRect(c.biggest, _imageSize);
+                        final canvasSize = _isSvg ? _svgSize : _imageSize;
+                        final rect = _containRect(c.biggest, canvasSize);
                         return GestureDetector(
                           onTapDown: (details) =>
                               _handleTap(details.localPosition, rect),
@@ -290,7 +428,19 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
                               Container(
                                 color: Colors.white,
                               ),
-                              if (_fillImage != null)
+                              if (_isSvg)
+                                Positioned.fromRect(
+                                  rect: rect,
+                                  child: CustomPaint(
+                                    painter: _SvgColoringPainter(
+                                      svgSize: _svgSize,
+                                      regions: _svgRegions,
+                                      outlines: _svgOutlines,
+                                      regionColors: _svgRegionColors,
+                                    ),
+                                  ),
+                                )
+                              else if (_fillImage != null)
                                 Positioned.fromRect(
                                   rect: rect,
                                   child: RawImage(
@@ -347,7 +497,10 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: _undoStack.isNotEmpty ? _undo : null,
+                    onPressed:
+                        (_isSvg ? _svgUndoStack.isNotEmpty : _undoStack.isNotEmpty)
+                            ? _undo
+                            : null,
                     icon: const Icon(Icons.undo),
                   ),
                   IconButton(
@@ -424,6 +577,8 @@ Uint8List _fillRegion(Map<String, dynamic> args) {
   final width = args['width'] as int;
   final height = args['height'] as int;
   final target = args['target'] as List;
+  final targetAlpha = (args['targetAlpha'] as int?) ?? 255;
+  final minAlpha = (args['minAlpha'] as int?) ?? 0;
   final color = args['color'] as List;
   final tol = (args['tol'] as int?) ?? 0;
 
@@ -437,9 +592,12 @@ Uint8List _fillRegion(Map<String, dynamic> args) {
   final out = Uint8List.fromList(fill);
   for (int i = 0; i < width * height; i++) {
     final o = i * 4;
+    final alpha = mask[o + 3];
+    if (alpha < minAlpha) continue;
     if ((mask[o] - tr).abs() <= tol &&
         (mask[o + 1] - tg).abs() <= tol &&
-        (mask[o + 2] - tb).abs() <= tol) {
+        (mask[o + 2] - tb).abs() <= tol &&
+        (alpha - targetAlpha).abs() <= tol) {
       out[o] = fr;
       out[o + 1] = fg;
       out[o + 2] = fb;
@@ -447,4 +605,156 @@ Uint8List _fillRegion(Map<String, dynamic> args) {
     }
   }
   return out;
+}
+
+Size _parseSvgSize(XmlElement svg) {
+  final viewBox = svg.getAttribute('viewBox');
+  if (viewBox != null && viewBox.trim().isNotEmpty) {
+    final nums = _parseNums(viewBox);
+    if (nums.length == 4 && nums[2] > 0 && nums[3] > 0) {
+      return Size(nums[2], nums[3]);
+    }
+  }
+  final w = double.tryParse(svg.getAttribute('width') ?? '');
+  final h = double.tryParse(svg.getAttribute('height') ?? '');
+  if (w != null && h != null && w > 0 && h > 0) {
+    return Size(w, h);
+  }
+  return const Size(1024, 1024);
+}
+
+List<_SvgRegion> _parseSvgRegions(XmlElement svg) {
+  final regionsGroup = svg
+      .findAllElements('g')
+      .where((g) => (g.getAttribute('id') ?? '') == 'regions')
+      .cast<XmlElement?>()
+      .firstWhere((g) => g != null, orElse: () => null);
+  if (regionsGroup == null) return const [];
+
+  final regions = <_SvgRegion>[];
+  for (final p in regionsGroup.findElements('path')) {
+    final id = p.getAttribute('id') ?? '';
+    final d = p.getAttribute('d') ?? '';
+    if (id.isEmpty || d.isEmpty) continue;
+    try {
+      regions.add(_SvgRegion(id: id, path: parseSvgPathData(d)));
+    } catch (_) {
+      // Skip malformed paths.
+    }
+  }
+  return regions;
+}
+
+List<_SvgOutline> _parseSvgOutlines(XmlElement svg) {
+  final outlineGroup = svg
+      .findAllElements('g')
+      .where((g) => (g.getAttribute('id') ?? '') == 'outline')
+      .cast<XmlElement?>()
+      .firstWhere((g) => g != null, orElse: () => null);
+  if (outlineGroup == null) return const [];
+
+  final groupStrokeWidth =
+      double.tryParse(outlineGroup.getAttribute('stroke-width') ?? '') ?? 18.0;
+  final outlines = <_SvgOutline>[];
+
+  for (final p in outlineGroup.findElements('path')) {
+    final d = p.getAttribute('d') ?? '';
+    if (d.isEmpty) continue;
+    final sw = double.tryParse(p.getAttribute('stroke-width') ?? '') ?? groupStrokeWidth;
+    try {
+      outlines.add(_SvgOutline(path: parseSvgPathData(d), strokeWidth: sw));
+    } catch (_) {
+      // Skip malformed paths.
+    }
+  }
+
+  for (final c in outlineGroup.findElements('circle')) {
+    final cx = double.tryParse(c.getAttribute('cx') ?? '');
+    final cy = double.tryParse(c.getAttribute('cy') ?? '');
+    final r = double.tryParse(c.getAttribute('r') ?? '');
+    if (cx == null || cy == null || r == null || r <= 0) continue;
+    final sw = double.tryParse(c.getAttribute('stroke-width') ?? '') ?? groupStrokeWidth;
+    final path = Path()..addOval(Rect.fromCircle(center: Offset(cx, cy), radius: r));
+    outlines.add(_SvgOutline(path: path, strokeWidth: sw));
+  }
+
+  return outlines;
+}
+
+List<double> _parseNums(String raw) {
+  final parts = raw.trim().split(RegExp(r'[ ,]+'));
+  final out = <double>[];
+  for (final p in parts) {
+    final v = double.tryParse(p);
+    if (v != null) out.add(v);
+  }
+  return out;
+}
+
+class _SvgRegion {
+  final String id;
+  final Path path;
+
+  const _SvgRegion({required this.id, required this.path});
+}
+
+class _SvgOutline {
+  final Path path;
+  final double strokeWidth;
+
+  const _SvgOutline({required this.path, required this.strokeWidth});
+}
+
+class _SvgColoringPainter extends CustomPainter {
+  final Size svgSize;
+  final List<_SvgRegion> regions;
+  final List<_SvgOutline> outlines;
+  final Map<String, Color> regionColors;
+
+  _SvgColoringPainter({
+    required this.svgSize,
+    required this.regions,
+    required this.outlines,
+    required this.regionColors,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (svgSize.width <= 0 || svgSize.height <= 0) return;
+
+    final scale = min(size.width / svgSize.width, size.height / svgSize.height);
+    final dx = (size.width - svgSize.width * scale) / 2;
+    final dy = (size.height - svgSize.height * scale) / 2;
+
+    canvas.save();
+    canvas.translate(dx, dy);
+    canvas.scale(scale);
+
+    final fillPaint = Paint()..style = PaintingStyle.fill;
+    for (final r in regions) {
+      fillPaint.color = regionColors[r.id] ?? Colors.white;
+      canvas.drawPath(r.path, fillPaint);
+    }
+
+    for (final o in outlines) {
+      final strokePaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..color = Colors.black
+        ..strokeWidth = o.strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..isAntiAlias = true;
+      canvas.drawPath(o.path, strokePaint);
+    }
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _SvgColoringPainter oldDelegate) {
+    return oldDelegate.regions != regions ||
+        oldDelegate.outlines != outlines ||
+        oldDelegate.regionColors != regionColors ||
+        oldDelegate.svgSize != svgSize;
+  }
 }

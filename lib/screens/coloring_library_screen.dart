@@ -206,6 +206,7 @@ class _ColoringCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final asset = AssetPath.normalize(page.imageAsset);
+    final isSvg = asset.toLowerCase().endsWith('.svg');
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.large),
@@ -231,14 +232,19 @@ class _ColoringCard extends StatelessWidget {
                   topLeft: Radius.circular(AppRadius.large),
                   topRight: Radius.circular(AppRadius.large),
                 ),
-                child: Image.asset(
-                  asset,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: AppColors.background,
-                    child: const Center(child: Icon(Icons.brush, size: 42)),
-                  ),
-                ),
+                child: isSvg
+                    ? Container(
+                        color: AppColors.background,
+                        child: const Center(child: Icon(Icons.brush, size: 42)),
+                      )
+                    : Image.asset(
+                        asset,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: AppColors.background,
+                          child: const Center(child: Icon(Icons.brush, size: 42)),
+                        ),
+                      ),
               ),
             ),
             Padding(

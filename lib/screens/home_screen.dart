@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:suzyapp/widgets/parent_gate_dialog.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../design_system/app_breakpoints.dart';
 import '../design_system/app_colors.dart';
@@ -27,12 +28,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const _kHomeTourSeen = 'home_tour_seen_v1';
   ReadingProgress? _progress;
+  bool _showHomeTour = false;
 
   @override
   void initState() {
     super.initState();
     _loadProgress();
+    _loadHomeTour();
   }
 
   Future<void> _loadProgress() async {
@@ -40,6 +44,20 @@ class _HomeScreenState extends State<HomeScreen> {
     final p = await widget.progressRepository.getReadingProgress();
     if (!mounted) return;
     setState(() => _progress = p);
+  }
+
+  Future<void> _loadHomeTour() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool(_kHomeTourSeen) ?? false;
+    if (!mounted) return;
+    setState(() => _showHomeTour = !seen);
+  }
+
+  Future<void> _dismissHomeTour() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kHomeTourSeen, true);
+    if (!mounted) return;
+    setState(() => _showHomeTour = false);
   }
 
   Future<void> _openParentSummary() async {
@@ -66,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Stack(
           alignment: Alignment.center,
-          children: const [
+          children: [
             Icon(Icons.pets, color: AppColors.textPrimary),
             Positioned(
               bottom: 8,
@@ -80,81 +98,177 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.large),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Align(alignment: Alignment.topRight, child: parentBtn),
-              const SizedBox(height: AppSpacing.small),
-              const _Header(childName: 'Kiddo'),
-              SizedBox(
-                height: isTablet ? AppSpacing.large : AppSpacing.medium,
+      body: Stack(
+        children: [
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.large),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Align(alignment: Alignment.topRight, child: parentBtn),
+                  const SizedBox(height: AppSpacing.small),
+                  const _Header(childName: 'Kiddo'),
+                  SizedBox(
+                    height: isTablet ? AppSpacing.large : AppSpacing.medium,
+                  ),
+
+                  _BigTile(
+                    title: 'Read Stories',
+                    subtitle: '',
+                    color: AppColors.tileBlue,
+                    icon: Icons.menu_book,
+                    onTap: () => Navigator.pushNamed(context, '/library')
+                        .then((_) => _loadProgress()),
+                  ),
+                  const SizedBox(height: AppSpacing.medium),
+
+                  _BigTile(
+                    title: 'Make a Story',
+                    subtitle: '',
+                    color: AppColors.tileYellow,
+                    icon: Icons.auto_stories,
+                    onTap: () => Navigator.pushNamed(context, '/create'),
+                  ),
+
+                  const SizedBox(height: AppSpacing.medium),
+
+                  _BigTile(
+                    title: 'Coloring',
+                    subtitle: '',
+                    color: AppColors.tileBlue,
+                    gradient: const LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Color(0xFFFF8A65),
+                        Color(0xFFFFD54F),
+                        Color(0xFF9CCC65),
+                        Color(0xFF4DD0E1),
+                        Color(0xFF9575CD),
+                      ],
+                    ),
+                    icon: Icons.brush,
+                    onTap: () => Navigator.pushNamed(context, '/coloring'),
+                  ),
+
+                  const SizedBox(height: AppSpacing.medium),
+
+                  if (_progress != null && _progress!.storyId != kMakeAStoryDemoId) ...[
+                    _BigTile(
+                      title: 'Continue',
+                      subtitle: '',
+                      color: AppColors.accentCoral.withOpacity(0.18),
+                      icon: Icons.play_circle_fill,
+                      onTap: () {
+                        Navigator.pushNamed(
+                          context,
+                          '/reader',
+                          arguments: StoryReaderArgs(
+                            _progress!.storyId,
+                            startPageIndex: _progress!.pageIndex,
+                          ),
+                        ).then((_) => _loadProgress());
+                      },
+                    ),
+                  ],
+                ],
               ),
-
-              _BigTile(
-                title: 'Read Stories',
-                subtitle: '',
-                color: AppColors.tileBlue,
-                icon: Icons.menu_book,
-                onTap: () => Navigator.pushNamed(context, '/library')
-                    .then((_) => _loadProgress()),
-              ),
-              const SizedBox(height: AppSpacing.medium),
-
-              _BigTile(
-                title: 'Make a Story',
-                subtitle: '',
-                color: AppColors.tileYellow,
-                icon: Icons.auto_stories,
-                onTap: () => Navigator.pushNamed(context, '/create'),
-              ),
-
-              const SizedBox(height: AppSpacing.medium),
-
-              _BigTile(
-                title: 'Coloring',
-                subtitle: '',
-                color: AppColors.tileBlue,
-                gradient: const LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    Color(0xFFFF8A65),
-                    Color(0xFFFFD54F),
-                    Color(0xFF9CCC65),
-                    Color(0xFF4DD0E1),
-                    Color(0xFF9575CD),
+            ),
+          ),
+          if (_showHomeTour)
+            Positioned(
+              top: AppSpacing.large,
+              right: AppSpacing.large,
+              child: Material(
+                color: Colors.transparent,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      constraints: const BoxConstraints(maxWidth: 240),
+                      padding: const EdgeInsets.all(AppSpacing.medium),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFEFA),
+                        borderRadius: BorderRadius.circular(32),
+                        border: Border.all(color: AppColors.outline),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: AppColors.shadow,
+                            blurRadius: 22,
+                            offset: Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.record_voice_over,
+                                size: 18,
+                                color: AppColors.textPrimary,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Parent Voice',
+                                  style: AppTypography.tileTitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.xsmall),
+                          const Text(
+                            'Tap the paw to use Parent Voice for reading.',
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
+                          const SizedBox(height: AppSpacing.small),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _dismissHomeTour,
+                              child: const Text('Got it'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      right: -14,
+                      top: 36,
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFFEFA),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppColors.outline),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFFEFA),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppColors.outline),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-                icon: Icons.brush,
-                onTap: () => Navigator.pushNamed(context, '/coloring'),
               ),
-
-              const SizedBox(height: AppSpacing.medium),
-
-              if (_progress != null && _progress!.storyId != kMakeAStoryDemoId) ...[
-                _BigTile(
-                  title: 'Continue',
-                  subtitle: '',
-                  color: AppColors.accentCoral.withOpacity(0.18),
-                  icon: Icons.play_circle_fill,
-                  onTap: () {
-                    Navigator.pushNamed(
-                      context,
-                      '/reader',
-                      arguments: StoryReaderArgs(
-                        _progress!.storyId,
-                        startPageIndex: _progress!.pageIndex,
-                      ),
-                    ).then((_) => _loadProgress());
-                  },
-                ),
-              ],
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }

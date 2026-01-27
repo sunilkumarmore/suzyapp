@@ -45,6 +45,8 @@ dependencies:
   shared_preferences: ^2.2.3
   record: ^4.4.0
   path_provider: ^2.1.3
+  xml: ^6.5.0
+  path_drawing: ^1.0.1
 
 dev_dependencies:
   flutter_test:
@@ -73,6 +75,7 @@ flutter:
     - assets/images/shy_lion_roar/
     - assets/audio/
     - assets/audio/sfx/page_flip.mp3
+    - assets/audio/sfx/color_fill.mp3
     - assets/templates/
     - assets/coloring/coloring_pages.json
 
