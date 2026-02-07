@@ -18,15 +18,29 @@
       "id": "elephant_01",
       "title": "Elephant",
       "ageBand": "4-7",
-      "imageAsset": "images/coloring/elephant.svg",
-      "maskAsset": ""
+      "imageAsset": "images/coloring/elephant_outline.png",
+      "maskAsset": "images/coloring/elephant_mask.png"
     },
+       
     {
       "id": "monkey_01",
       "title": "Monkey",
       "ageBand": "4-7",
       "imageAsset": "images/coloring/monkey_outline.png",
       "maskAsset": "images/coloring/monkey_mask.png"
+    },
+       {
+      "id": "giraffe_01",
+      "title": "Giraffe",
+      "ageBand": "4-7",
+      "imageAsset": "images/coloring/giraffe_outline.png",
+      "maskAsset": "images/coloring/giraffe_mask.png"
+    },   {
+      "id": "zebra_01",
+      "title": "Zebra",
+      "ageBand": "4-7",
+      "imageAsset": "images/coloring/zebra_outline.png",
+      "maskAsset": "images/coloring/zebra_mask.png"
     }
   ]
 }

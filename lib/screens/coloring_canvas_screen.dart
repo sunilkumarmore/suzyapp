@@ -116,14 +116,20 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
       mask = null;
     }
 
-    final Size size = mask != null
-        ? Size(mask.width.toDouble(), mask.height.toDouble())
-        : (outline != null
-            ? Size(outline.width.toDouble(), outline.height.toDouble())
-            : const Size(1, 1));
+    final int imgW = mask?.width ?? outline?.width ?? 1;
+    final int imgH = mask?.height ?? outline?.height ?? 1;
+    final Size size = Size(imgW.toDouble(), imgH.toDouble());
     final maskPixels = mask != null
         ? await _rgbaBytes(mask)
-        : _solidRgba(size.width.toInt(), size.height.toInt(), const Color(0xFF000000));
+        : _solidRgba(imgW, imgH, const Color(0xFF000000));
+
+    if (kDebugMode && mask != null) {
+      debugPrint('mask decoded size: ${mask.width}x${mask.height}, len=${maskPixels.length}');
+    }
+
+    if (outline != null) {
+      outline = await _extractLineArt(outline);
+    }
 
     if (!mounted) return;
     setState(() {
@@ -196,6 +202,39 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
     return bytes.buffer.asUint8List();
   }
 
+  Future<ui.Image> _extractLineArt(ui.Image img) async {
+    final rgba = await _rgbaBytes(img);
+    if (rgba.isEmpty) return img;
+
+    for (int i = 0; i < rgba.length; i += 4) {
+      final r = rgba[i];
+      final g = rgba[i + 1];
+      final b = rgba[i + 2];
+      final a = rgba[i + 3];
+      if (a == 0) continue;
+      // Keep only dark line-art pixels; make everything else transparent.
+      final isLine = r <= 90 && g <= 90 && b <= 90;
+      if (isLine) {
+        rgba[i] = 0;
+        rgba[i + 1] = 0;
+        rgba[i + 2] = 0;
+        rgba[i + 3] = 255;
+      } else {
+        rgba[i + 3] = 0;
+      }
+    }
+
+    final completer = Completer<ui.Image>();
+    ui.decodeImageFromPixels(
+      rgba,
+      img.width,
+      img.height,
+      ui.PixelFormat.rgba8888,
+      (lineArt) => completer.complete(lineArt),
+    );
+    return completer.future;
+  }
+
   Uint8List _solidRgba(int w, int h, Color color) {
     final out = Uint8List(w * h * 4);
     for (int i = 0; i < w * h; i++) {
@@ -248,27 +287,73 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
     if (_maskPixels == null || _fillPixels == null) return;
     if (!rect.contains(localPos)) return;
 
-    final x = ((localPos.dx - rect.left) / rect.width * _imageSize.width)
-        .clamp(0, _imageSize.width - 1)
-        .toInt();
-    final y = ((localPos.dy - rect.top) / rect.height * _imageSize.height)
-        .clamp(0, _imageSize.height - 1)
-        .toInt();
-    final idx = (y * _imageSize.width.toInt() + x) * 4;
+    final imgW = _imageSize.width.toInt();
+    final imgH = _imageSize.height.toInt();
+    if (imgW <= 0 || imgH <= 0) return;
+
+    final scale = min(rect.width / imgW, rect.height / imgH);
+    if (scale <= 0) return;
+    final drawnW = imgW * scale;
+    final drawnH = imgH * scale;
+    final offsetX = rect.left + (rect.width - drawnW) / 2;
+    final offsetY = rect.top + (rect.height - drawnH) / 2;
+
+    final x = ((localPos.dx - offsetX) / scale).round();
+    final y = ((localPos.dy - offsetY) / scale).round();
+    if (x < 0 || x >= imgW || y < 0 || y >= imgH) return;
     final mask = _maskPixels!;
+    int tx = x;
+    int ty = y;
+    int idx = (ty * imgW + tx) * 4;
     if (idx < 0 || idx + 3 >= mask.length) return;
-    final r = mask[idx];
-    final g = mask[idx + 1];
-    final b = mask[idx + 2];
-    final a = mask[idx + 3];
+    int r = mask[idx];
+    int g = mask[idx + 1];
+    int b = mask[idx + 2];
+    int a = mask[idx + 3];
+
+    // If user taps a boundary pixel, search nearby for the nearest fillable region.
+    bool isBlocked(int rr, int gg, int bb, int aa) =>
+        aa == 0 || (rr == 0 && gg == 0 && bb == 0);
+    if (isBlocked(r, g, b, a)) {
+      const maxRadius = 12;
+      bool found = false;
+      for (int radius = 1; radius <= maxRadius && !found; radius++) {
+        for (int dy = -radius; dy <= radius && !found; dy++) {
+          for (int dx = -radius; dx <= radius; dx++) {
+            final nx = x + dx;
+            final ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= imgW || ny >= imgH) continue;
+            final nidx = (ny * imgW + nx) * 4;
+            final nr = mask[nidx];
+            final ng = mask[nidx + 1];
+            final nb = mask[nidx + 2];
+            final na = mask[nidx + 3];
+            if (!isBlocked(nr, ng, nb, na)) {
+              tx = nx;
+              ty = ny;
+              idx = nidx;
+              r = nr;
+              g = ng;
+              b = nb;
+              a = na;
+              found = true;
+              break;
+            }
+          }
+        }
+      }
+      if (!found) return;
+    }
 
     if (kDebugMode) {
       debugPrint(
-        'fill tap: x=$x y=$y idx=$idx maskLen=${mask.length} rgba=($r,$g,$b,$a)',
+        'fill tap: x=$x y=$y -> tx=$tx ty=$ty imgW=$imgW imgH=$imgH idx=$idx maskLen=${mask.length} rgba=($r,$g,$b,$a)',
       );
     }
 
-    if (a < 10) return;
+    // Ignore fully transparent/background taps after neighbor search.
+    if (a == 0) return;
+    if (r == 0 && g == 0 && b == 0) return;
 
     _undoStack.add(Uint8List.fromList(_fillPixels!));
     _isFilling = true;
@@ -277,14 +362,16 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
     final fill = await compute(_fillRegion, {
       'mask': _maskPixels!,
       'fill': _fillPixels!,
-      'width': _imageSize.width.toInt(),
-      'height': _imageSize.height.toInt(),
+      'width': imgW,
+      'height': imgH,
+      'x': tx,
+      'y': ty,
       'target': [r, g, b],
-      'targetAlpha': a,
-      // Be strict at edges to avoid coloring outside soft/dirty masks.
-      'minAlpha': 200,
+      'targetAlpha': 255,
+      'minAlpha': 1,
       'color': [color.red, color.green, color.blue],
-      'tol': 0,
+      'tol': 12,
+      'ignoreBlack': true,
     });
 
     if (!mounted) return;
@@ -449,13 +536,14 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
                                     filterQuality: FilterQuality.none,
                                   ),
                                 ),
-                              if (_outlineImage != null)
+                              if (!_isSvg && _outlineImage != null)
                                 Positioned.fromRect(
                                   rect: rect,
-                                  child: RawImage(
-                                    image: _outlineImage,
-                                    fit: BoxFit.fill,
-                                    filterQuality: FilterQuality.none,
+                                  child: CustomPaint(
+                                    painter: _ImageOverlayPainter(
+                                      image: _outlineImage!,
+                                      blendMode: BlendMode.multiply,
+                                    ),
                                   ),
                                 ),
                               if (_sparkleOffset != null)
@@ -576,11 +664,14 @@ Uint8List _fillRegion(Map<String, dynamic> args) {
   final fill = args['fill'] as Uint8List;
   final width = args['width'] as int;
   final height = args['height'] as int;
+  final x = args['x'] as int;
+  final y = args['y'] as int;
   final target = args['target'] as List;
   final targetAlpha = (args['targetAlpha'] as int?) ?? 255;
   final minAlpha = (args['minAlpha'] as int?) ?? 0;
   final color = args['color'] as List;
   final tol = (args['tol'] as int?) ?? 0;
+  final ignoreBlack = (args['ignoreBlack'] as bool?) ?? false;
 
   final tr = target[0] as int;
   final tg = target[1] as int;
@@ -590,20 +681,123 @@ Uint8List _fillRegion(Map<String, dynamic> args) {
   final fb = color[2] as int;
 
   final out = Uint8List.fromList(fill);
+  if (width <= 0 || height <= 0) return out;
+  if (x < 0 || y < 0 || x >= width || y >= height) return out;
+
+  if (ignoreBlack && tr == 0 && tg == 0 && tb == 0) return out;
+
+  bool matchesAt(int offset, int localTol) {
+    final alpha = mask[offset + 3];
+    if (alpha < minAlpha) return false;
+    final rr = mask[offset];
+    final gg = mask[offset + 1];
+    final bb = mask[offset + 2];
+    // Treat pure black as hard boundary; allow dark colors as valid regions.
+    if (ignoreBlack && rr == 0 && gg == 0 && bb == 0) {
+      return false;
+    }
+    final dr = (rr - tr).abs();
+    final dg = (gg - tg).abs();
+    final db = (bb - tb).abs();
+    final da = (alpha - targetAlpha).abs();
+    return dr <= localTol && dg <= localTol && db <= localTol && da <= 255;
+  }
+
+  final start = y * width + x;
+  final startOffset = start * 4;
+  if (!matchesAt(startOffset, tol)) return out;
+
+  // First-pass for ID-map masks: recolor all pixels that match tapped region color.
+  // This is robust when regions are disconnected or have tiny boundary breaks.
+  const regionTol = 32;
+  int globalPainted = 0;
   for (int i = 0; i < width * height; i++) {
     final o = i * 4;
-    final alpha = mask[o + 3];
-    if (alpha < minAlpha) continue;
-    if ((mask[o] - tr).abs() <= tol &&
-        (mask[o + 1] - tg).abs() <= tol &&
-        (mask[o + 2] - tb).abs() <= tol &&
-        (alpha - targetAlpha).abs() <= tol) {
+    final rr = mask[o];
+    final gg = mask[o + 1];
+    final bb = mask[o + 2];
+    final aa = mask[o + 3];
+    if (aa == 0) continue;
+    if (ignoreBlack && rr == 0 && gg == 0 && bb == 0) continue;
+    if ((rr - tr).abs() <= regionTol &&
+        (gg - tg).abs() <= regionTol &&
+        (bb - tb).abs() <= regionTol) {
       out[o] = fr;
       out[o + 1] = fg;
       out[o + 2] = fb;
       out[o + 3] = 255;
+      globalPainted++;
     }
   }
+  if (kDebugMode) {
+    debugPrint(
+      'fill global match: tol=$regionTol painted=$globalPainted target=($tr,$tg,$tb)',
+    );
+  }
+  if (globalPainted > 0) return out;
+
+  int paintFlood(bool Function(int offset) matcher) {
+    final visited = Uint8List(width * height);
+    final queue = <int>[start];
+    int head = 0;
+    int painted = 0;
+
+    while (head < queue.length) {
+      final p = queue[head++];
+      if (visited[p] == 1) continue;
+      visited[p] = 1;
+
+      final o = p * 4;
+      if (!matcher(o)) continue;
+
+      out[o] = fr;
+      out[o + 1] = fg;
+      out[o + 2] = fb;
+      out[o + 3] = 255;
+      painted++;
+
+      final px = p % width;
+      final py = p ~/ width;
+
+      if (px > 0) queue.add(p - 1);
+      if (px < width - 1) queue.add(p + 1);
+      if (py > 0) queue.add(p - width);
+      if (py < height - 1) queue.add(p + width);
+    }
+    return painted;
+  }
+
+  final painted = paintFlood((offset) => matchesAt(offset, tol));
+  if (painted <= 16) {
+    // Retry with progressively looser tolerance for noisy id-map exports.
+    final retryPainted = paintFlood((offset) => matchesAt(offset, 36));
+    if (retryPainted <= 16) {
+      final retryPainted2 = paintFlood((offset) => matchesAt(offset, 72));
+      if (retryPainted2 <= 16) {
+        // Last fallback: global near-color replace for this tapped region color.
+        // This helps when exported id-maps have slight color drift.
+        const globalTol = 8;
+        for (int i = 0; i < width * height; i++) {
+          final o = i * 4;
+          final rr = mask[o];
+          final gg = mask[o + 1];
+          final bb = mask[o + 2];
+          final aa = mask[o + 3];
+          if (aa == 0) continue;
+          if (ignoreBlack && rr == 0 && gg == 0 && bb == 0) continue;
+          if ((rr - tr).abs() <= globalTol &&
+              (gg - tg).abs() <= globalTol &&
+              (bb - tb).abs() <= globalTol) {
+            out[o] = fr;
+            out[o + 1] = fg;
+            out[o + 2] = fb;
+            out[o + 3] = 255;
+          }
+        }
+      }
+    }
+  }
+
   return out;
 }
 
@@ -756,5 +950,35 @@ class _SvgColoringPainter extends CustomPainter {
         oldDelegate.outlines != outlines ||
         oldDelegate.regionColors != regionColors ||
         oldDelegate.svgSize != svgSize;
+  }
+}
+
+class _ImageOverlayPainter extends CustomPainter {
+  final ui.Image image;
+  final BlendMode blendMode;
+
+  const _ImageOverlayPainter({
+    required this.image,
+    this.blendMode = BlendMode.srcOver,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final src = Rect.fromLTWH(
+      0,
+      0,
+      image.width.toDouble(),
+      image.height.toDouble(),
+    );
+    final dst = Rect.fromLTWH(0, 0, size.width, size.height);
+    final paint = Paint()
+      ..blendMode = blendMode
+      ..filterQuality = FilterQuality.none;
+    canvas.drawImageRect(image, src, dst, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ImageOverlayPainter oldDelegate) {
+    return oldDelegate.image != image || oldDelegate.blendMode != blendMode;
   }
 }
