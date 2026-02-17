@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../design_system/app_colors.dart';
 import '../design_system/app_radius.dart';
@@ -205,7 +206,9 @@ class _ColoringCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final asset = AssetPath.normalize(page.imageAsset);
+    final imageRaw = page.imageAsset.trim();
+    final asset = AssetPath.normalize(imageRaw);
+    final isRemote = AssetPath.isRemote(asset);
     final isSvg = asset.toLowerCase().endsWith('.svg');
     return InkWell(
       onTap: onTap,
@@ -237,14 +240,25 @@ class _ColoringCard extends StatelessWidget {
                         color: AppColors.background,
                         child: const Center(child: Icon(Icons.brush, size: 42)),
                       )
-                    : Image.asset(
-                        asset,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: AppColors.background,
-                          child: const Center(child: Icon(Icons.brush, size: 42)),
-                        ),
-                      ),
+                    : isRemote
+                        ? CachedNetworkImage(
+                            imageUrl: asset,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) =>
+                                const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                            errorWidget: (_, __, ___) => Container(
+                              color: AppColors.background,
+                              child: const Center(child: Icon(Icons.brush, size: 42)),
+                            ),
+                          )
+                        : Image.asset(
+                            asset,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: AppColors.background,
+                              child: const Center(child: Icon(Icons.brush, size: 42)),
+                            ),
+                          ),
               ),
             ),
             Padding(

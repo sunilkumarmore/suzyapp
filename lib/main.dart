@@ -24,6 +24,8 @@ import 'repositories/firestore_adventure_template_repository.dart';
 import 'repositories/parent_voice_settings_repository.dart';
 import 'repositories/coloring_repository.dart';
 import 'repositories/asset_coloring_repository.dart';
+import 'repositories/firestore_coloring_repository.dart';
+import 'repositories/composite_coloring_repository.dart';
 
 // Screens
 import 'screens/home_screen.dart';
@@ -108,7 +110,10 @@ Future<void> main() async {
       cloud: FirestoreProgressRepository(),
     );
 
-    final ColoringRepository coloringRepo = AssetColoringRepository();
+    final ColoringRepository coloringRepo = CompositeColoringRepository(
+      primary: FirestoreColoringRepository(),
+      fallback: AssetColoringRepository(),
+    );
 
     // 7. Launch the actual App
     runApp(

@@ -139,9 +139,12 @@ export const generateNarration = onRequest(
       }
 
       const config = await getNarrationConfig();
-      const resolvedVoiceId =
-        (typeof voiceId === "string" && voiceId.trim().length >= 3 ? voiceId.trim() : "") ||
-        (config.defaultNarratorVoiceId ?? "");
+      const requestedVoiceId = typeof voiceId === "string" ? voiceId.trim() : "";
+      const useBackendDefault =
+        requestedVoiceId.length === 0 || requestedVoiceId.toLowerCase() === "default";
+      const resolvedVoiceId = useBackendDefault
+        ? (config.defaultNarratorVoiceId ?? "")
+        : requestedVoiceId;
       if (!resolvedVoiceId || resolvedVoiceId.length < 3) {
         res.status(400).json({ error: "Invalid voiceId" });
         return;

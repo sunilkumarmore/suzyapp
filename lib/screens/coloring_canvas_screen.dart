@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
 import 'package:path_drawing/path_drawing.dart';
 import 'package:xml/xml.dart';
@@ -57,6 +58,7 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
   final List<Uint8List> _undoStack = [];
   bool _isFilling = false;
   final AudioPlayer _sfxPlayer = AudioPlayer();
+  String? _assetLoadError;
 
   final List<Color> _palette = [
     const Color(0xFFE35A55),
@@ -97,6 +99,7 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
     final page = widget.pages[_index];
     final outlinePath = AssetPath.normalize(page.imageAsset);
     final maskPath = AssetPath.normalize(page.maskAsset);
+    _assetLoadError = null;
 
     if (outlinePath.toLowerCase().endsWith('.svg')) {
       await _loadSvgAssets(outlinePath);
@@ -107,13 +110,26 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
     ui.Image? mask;
     try {
       outline = await _loadUiImage(outlinePath);
-    } catch (_) {
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Coloring outline load failed: $outlinePath -> $e');
+      }
       outline = null;
     }
     try {
       mask = await _loadUiImage(maskPath);
-    } catch (_) {
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Coloring mask load failed: $maskPath -> $e');
+      }
       mask = null;
+    }
+
+    if (outline == null && mask == null) {
+      _assetLoadError = 'Could not load outline or mask for this page.';
+      if (kDebugMode) {
+        debugPrint('Coloring asset load failed for page=${page.id}');
+      }
     }
 
     final int imgW = mask?.width ?? outline?.width ?? 1;
@@ -185,8 +201,20 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
   }
 
   Future<ui.Image> _loadUiImage(String assetPath) async {
-    final data = await rootBundle.load(assetPath);
-    final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+    final Uint8List bytes;
+    if (AssetPath.isRemote(assetPath)) {
+      final uri = Uri.parse(assetPath);
+      final resp = await http.get(uri);
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        throw Exception('Failed to fetch image: ${resp.statusCode} $assetPath');
+      }
+      bytes = resp.bodyBytes;
+    } else {
+      final data = await rootBundle.load(assetPath);
+      bytes = data.buffer.asUint8List();
+    }
+
+    final codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();
     return frame.image;
   }
@@ -568,6 +596,25 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
                                       Icons.auto_awesome,
                                       size: 48,
                                       color: Colors.black.withOpacity(0.2),
+                                    ),
+                                  ),
+                                ),
+                              if (_assetLoadError != null)
+                                Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.9),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      _assetLoadError!,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                 ),

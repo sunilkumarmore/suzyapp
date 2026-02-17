@@ -46,6 +46,12 @@ class StoryReaderScreen extends StatefulWidget {
 }
 
 class _StoryReaderScreenState extends State<StoryReaderScreen> {
+  static const String _backendDefaultNarratorVoiceId = 'default';
+  static const Set<String> _allowedNarrationModes = {
+    'narrator',
+    'parent',
+    'tts',
+  };
   late Future<Story> _future;
   Story? _storyCache;
 
@@ -156,6 +162,8 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
       setState(() {
         _parentVoiceEnabled = false;
         _parentVoiceId = '';
+        _narrationMode = 'narrator';
+        _narratorVoiceId = _backendDefaultNarratorVoiceId;
       });
       return;
     }
@@ -176,12 +184,16 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
           : ParentVoiceSettings.defaults().elevenlabsSettings;
 
       final modeRaw = data['narrationMode'];
-      _narrationMode = (modeRaw is String && modeRaw.trim().isNotEmpty)
-          ? modeRaw.trim()
+      final modeParsed = (modeRaw is String) ? modeRaw.trim().toLowerCase() : '';
+      _narrationMode = _allowedNarrationModes.contains(modeParsed)
+          ? modeParsed
           : 'narrator';
 
       final narrRaw = data['narratorVoiceId'];
-      _narratorVoiceId = (narrRaw is String) ? narrRaw.trim() : '';
+      final narrParsed = (narrRaw is String) ? narrRaw.trim() : '';
+      _narratorVoiceId = narrParsed.isNotEmpty
+          ? narrParsed
+          : _backendDefaultNarratorVoiceId;
     });
 
     if (kDebugMode) {
@@ -272,8 +284,11 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
     }
 
     try {
+      final requestVoiceId = _narratorVoiceId.isNotEmpty
+          ? _narratorVoiceId
+          : _backendDefaultNarratorVoiceId;
       final url = await _narratorService.generateNarration(
-        voiceId: _narratorVoiceId,
+        voiceId: requestVoiceId,
         storyId: story.id,
         pageIndex: page.index,
         lang: _langForBackend(story.language),
@@ -293,6 +308,20 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
       _narratorCooldownUntil = DateTime.now().add(const Duration(minutes: 3));
       return null;
     }
+  }
+
+  Future<String?> _waitForNarratorUrl({
+    required Story story,
+    required StoryPage page,
+    int retries = 3,
+  }) async {
+    for (int i = 0; i < retries; i++) {
+      await Future.delayed(const Duration(milliseconds: 700));
+      final retryUrl = await _getNarratorUrl(story: story, page: page);
+      if (retryUrl != null && retryUrl.isNotEmpty) return retryUrl;
+      if (_cooldownActive(_narratorCooldownUntil)) return null;
+    }
+    return null;
   }
 
   void _prefetchNextNarrator(Story story) {
@@ -328,6 +357,16 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
         await _playUrl(narratorUrl);
         _prefetchNextNarrator(story);
         return;
+      }
+      // If narrator is still generating (202 path), retry a few times before
+      // dropping to fallback audio sources.
+      if (_narrationMode == 'narrator') {
+        final narratorRetryUrl = await _waitForNarratorUrl(story: story, page: page);
+        if (narratorRetryUrl != null && narratorRetryUrl.isNotEmpty) {
+          await _playUrl(narratorRetryUrl);
+          _prefetchNextNarrator(story);
+          return;
+        }
       }
 
       final user = FirebaseAuth.instance.currentUser;

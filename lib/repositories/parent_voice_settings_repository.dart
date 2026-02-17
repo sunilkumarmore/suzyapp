@@ -12,6 +12,12 @@ class ParentVoiceSettingsRepository {
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
+  static const String backendDefaultNarratorVoiceId = 'default';
+  static const Set<String> _allowedNarrationModes = {
+    'narrator',
+    'parent',
+    'tts',
+  };
 
   /// Ensures users/{uid}/settings/audio exists and has correct types.
   /// Safe to call on every app start.
@@ -33,7 +39,7 @@ class ParentVoiceSettingsRepository {
     bool parentVoiceEnabled = false;
     String elevenVoiceId = '';
     String narrationMode = 'narrator';
-    String narratorVoiceId = '';
+    String narratorVoiceId = backendDefaultNarratorVoiceId;
     Map<String, dynamic> elevenlabsSettings = ParentVoiceSettings.defaults().elevenlabsSettings;
 
     if (snap.exists) {
@@ -56,12 +62,15 @@ class ParentVoiceSettingsRepository {
 
       final rawMode = data['narrationMode'];
       if (rawMode is String && rawMode.trim().isNotEmpty) {
-        narrationMode = rawMode.trim();
+        final mode = rawMode.trim().toLowerCase();
+        if (_allowedNarrationModes.contains(mode)) {
+          narrationMode = mode;
+        }
       }
 
       final rawNarratorId = data['narratorVoiceId'];
-      if (rawNarratorId is String) {
-        narratorVoiceId = rawNarratorId;
+      if (rawNarratorId is String && rawNarratorId.trim().isNotEmpty) {
+        narratorVoiceId = rawNarratorId.trim();
       }
 
       final rawSettings = data['elevenlabsSettings'];
