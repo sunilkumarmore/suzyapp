@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:suzyapp/widgets/parent_gate_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -31,12 +32,14 @@ class _HomeScreenState extends State<HomeScreen> {
   static const _kHomeTourSeen = 'home_tour_seen_v1';
   ReadingProgress? _progress;
   bool _showHomeTour = false;
+  String _appVersionLabel = '';
 
   @override
   void initState() {
     super.initState();
     _loadProgress();
     _loadHomeTour();
+    _loadVersionLabel();
   }
 
   Future<void> _loadProgress() async {
@@ -60,6 +63,12 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _showHomeTour = false);
   }
 
+  Future<void> _loadVersionLabel() async {
+    final info = await PackageInfo.fromPlatform();
+    if (!mounted) return;
+    setState(() => _appVersionLabel = 'v${info.version}+${info.buildNumber}');
+  }
+
   Future<void> _openParentSummary() async {
     final allowed = await showParentGate(context);
     if (!allowed) return;
@@ -71,6 +80,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
     final isTablet = w > AppBreakpoints.phoneMaxWidth;
+    final tourRight = (w - 300).clamp(8.0, AppSpacing.large + 64).toDouble();
+    final tourMaxWidth = (w - tourRight - 16).clamp(190.0, 270.0).toDouble();
     final parentBtn = InkWell(
       borderRadius: BorderRadius.circular(AppRadius.large),
       onTap: _openParentSummary,
@@ -178,97 +189,156 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           if (_showHomeTour)
             Positioned(
-              top: AppSpacing.large,
-              right: AppSpacing.large,
-              child: Material(
-                color: Colors.transparent,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      constraints: const BoxConstraints(maxWidth: 240),
-                      padding: const EdgeInsets.all(AppSpacing.medium),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFEFA),
-                        borderRadius: BorderRadius.circular(32),
-                        border: Border.all(color: AppColors.outline),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: AppColors.shadow,
-                            blurRadius: 22,
-                            offset: Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.record_voice_over,
-                                size: 18,
-                                color: AppColors.textPrimary,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  'Parent Voice',
-                                  style: AppTypography.tileTitle,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpacing.xsmall),
-                          const Text(
-                            'Tap the paw to use Parent Voice for reading.',
-                            style: TextStyle(color: AppColors.textSecondary),
-                          ),
-                          const SizedBox(height: AppSpacing.small),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: _dismissHomeTour,
-                              child: const Text('Got it'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Positioned(
-                      right: -14,
-                      top: 36,
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 16,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFFEFA),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: AppColors.outline),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFFEFA),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: AppColors.outline),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+              top: AppSpacing.large + 6,
+              right: tourRight,
+              child: _HomeTourCloud(
+                onDismiss: _dismissHomeTour,
+                maxWidth: tourMaxWidth,
+              ),
+            ),
+          if (_appVersionLabel.isNotEmpty)
+            Positioned(
+              right: AppSpacing.medium,
+              bottom: AppSpacing.medium,
+              child: IgnorePointer(
+                child: Text(
+                  _appVersionLabel,
+                  style: AppTypography.tileSubtitle.copyWith(
+                    fontSize: 12,
+                    color: AppColors.textSecondary.withOpacity(0.8),
+                  ),
                 ),
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _HomeTourCloud extends StatelessWidget {
+  final VoidCallback onDismiss;
+  final double maxWidth;
+
+  const _HomeTourCloud({
+    required this.onDismiss,
+    required this.maxWidth,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const cloud = Color(0xFFFFFEFA);
+    return Material(
+      color: Colors.transparent,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            padding: const EdgeInsets.fromLTRB(16, 14, 14, 10),
+            decoration: BoxDecoration(
+              color: cloud,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: AppColors.outline),
+              boxShadow: const [
+                BoxShadow(
+                  color: AppColors.shadow,
+                  blurRadius: 24,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.record_voice_over, size: 18, color: AppColors.textPrimary),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Parent Voice',
+                        maxLines: 1,
+                        overflow: TextOverflow.fade,
+                        softWrap: false,
+                        style: TextStyle(
+                          fontSize: 23,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textPrimary,
+                          height: 1.0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xsmall),
+                const Text(
+                  'Tap the paw to use Parent Voice for reading.',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: AppSpacing.xsmall),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: onDismiss,
+                    child: const Text('Got it'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 18,
+            top: -10,
+            child: _CloudBump(color: cloud, size: 26),
+          ),
+          Positioned(
+            left: 54,
+            top: -14,
+            child: _CloudBump(color: cloud, size: 32),
+          ),
+          Positioned(
+            right: 44,
+            top: -11,
+            child: _CloudBump(color: cloud, size: 28),
+          ),
+          Positioned(
+            right: -16,
+            top: 48,
+            child: Transform.rotate(
+              angle: 0.65,
+              child: _CloudBump(color: cloud, size: 20),
+            ),
+          ),
+          Positioned(
+            right: -30,
+            top: 62,
+            child: Transform.rotate(
+              angle: 0.65,
+              child: _CloudBump(color: cloud, size: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CloudBump extends StatelessWidget {
+  final Color color;
+  final double size;
+
+  const _CloudBump({required this.color, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.outline),
       ),
     );
   }

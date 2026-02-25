@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(ownerUid) {
+      return signedIn() && ownerUid == request.auth.uid;
+    }
+
+    match /users/{uid} {
+      allow read, write: if signedIn() && uid == request.auth.uid;
+    }
+    
+    // App writes user data under nested paths, e.g.:
+    // users/{uid}/settings/audio and users/{uid}/progress/...
+    match /users/{uid}/{doc=**} {
+      allow read, write: if signedIn() && uid == request.auth.uid;
+    }
+
+    // App content collections: read-only from client.
+    match /stories/{doc=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /adventure_templates/{doc=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /coloring_pages/{doc=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /workers/{workerId} {
+      allow read: if signedIn() && isOwner(resource.data.ownerUid);
+      allow create: if signedIn() && isOwner(request.resource.data.ownerUid);
+      allow update, delete: if signedIn() && isOwner(resource.data.ownerUid);
+    }
+
+    match /pipelines/{pipelineId} {
+      allow read: if signedIn() && isOwner(resource.data.ownerUid);
+      allow create: if signedIn() && isOwner(request.resource.data.ownerUid);
+      allow update, delete: if signedIn() && isOwner(resource.data.ownerUid);
+    }
+
+    match /jobs/{jobId} {
+      allow read: if signedIn() && isOwner(resource.data.ownerUid);
+      allow create: if signedIn() && isOwner(request.resource.data.ownerUid);
+      allow update, delete: if signedIn() && isOwner(resource.data.ownerUid);
+
+      match /events/{eventId} {
+        allow read: if signedIn() && isOwner(get(/databases/$(database)/documents/jobs/$(jobId)).data.ownerUid);
+        allow write: if signedIn() && isOwner(get(/databases/$(database)/documents/jobs/$(jobId)).data.ownerUid);
+      }
+
+      match /approvals/{approvalId} {
+        allow read, write: if signedIn() && isOwner(get(/databases/$(database)/documents/jobs/$(jobId)).data.ownerUid);
+      }
+    }
+  }
+}

@@ -15,7 +15,6 @@ import 'repositories/composite_story_repository.dart';
 import 'repositories/progress_repository.dart';
 import 'repositories/composite_progress_repository.dart';
 import 'repositories/local_progress_repository.dart';
-import 'repositories/mock_progress_repository.dart';
 import 'repositories/firestore_progress_repository.dart';
 import 'repositories/asset_adventure_template_repository.dart';
 import 'repositories/adventure_template_repository.dart';
@@ -187,13 +186,16 @@ Future<void> ensureAnonAuth() async {
 }
 
 Future<void> configureAuthPersistenceForWeb() async {
-FirebaseAuth.instance.authStateChanges().listen((User? user) {
-  if (user == null) {
-    print('User is currently signed out!');
-  } else {
-    print('User is signed in!');
+  try {
+    await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+    if (kDebugMode) {
+      debugPrint('AUTH web persistence set to LOCAL');
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint('AUTH web persistence setup failed: $e');
+    }
   }
-});
 }
 class _SuzyAppState extends State<SuzyApp> with WidgetsBindingObserver {
   @override

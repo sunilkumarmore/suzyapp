@@ -1,48 +1,6 @@
 {
   "templates": [
     {
-      "id": "tpl_my_first_adventure",
-      "title": "My Little Adventure",
-      "ageBand": "2-3",
-      "slots": ["hero", "place", "friend", "object", "feeling"],
-      "choices": {
-        "hero": [
-          { "id": "bear", "label": "Bear", "emoji": "🐻" , "imageAsset": "images/adventure/hero_bear.png" },
-          { "id": "lion", "label": "Lion", "emoji": "🦁" , "imageAsset": "images/adventure/hero_lion.png" },
-          { "id": "bunny", "label": "Bunny", "emoji": "🐰" , "imageAsset": "images/adventure/hero_bunny.png" }
-        ],
-        "place": [
-          { "id": "park", "label": "Park", "emoji": "🏞️" , "imageAsset": "images/adventure/place_park.png" },
-          { "id": "beach", "label": "Beach", "emoji": "🏖️" , "imageAsset": "images/adventure/place_beach.png" },
-          { "id": "home", "label": "Home", "emoji": "🏠" , "imageAsset": "images/adventure/place_home.png" }
-        ],
-        "friend": [
-          { "id": "turtle", "label": "Turtle", "emoji": "🐢" , "imageAsset": "images/adventure/friend_turtle.png" },
-          { "id": "duck", "label": "Duck", "emoji": "🦆" , "imageAsset": "images/adventure/friend_duck.png" },
-          { "id": "cat", "label": "Cat", "emoji": "🐱" , "imageAsset": "images/adventure/friend_cat.png" }
-        ],
-        "object": [
-          { "id": "ball", "label": "Ball", "emoji": "⚽" , "imageAsset": "images/adventure/object_ball.png" },
-          { "id": "star", "label": "Star", "emoji": "⭐" , "imageAsset": "images/adventure/object_star.png" },
-          { "id": "hat", "label": "Hat", "emoji": "🎩" , "imageAsset": "images/adventure/object_hat.png" }
-        ],
-        "feeling": [
-          { "id": "happy", "label": "Happy", "emoji": "😊" , "imageAsset": "images/adventure/feeling_happy.png" },
-          { "id": "brave", "label": "Brave", "emoji": "💪" , "imageAsset": "images/adventure/feeling_brave.png" },
-          { "id": "proud", "label": "Proud", "emoji": "🌟" , "imageAsset": "images/adventure/feeling_proud.png" }
-        ]
-      },
-      "pages": [
-        { "text": "{hero} went to the {place}." },
-        { "text": "There, {hero} met a {friend}." },
-        { "text": "They found a {object} on the ground." },
-        { "text": "{hero} felt very {feeling}." },
-        { "text": "They played together and had fun." },
-        { "text": "The end. Great job, {hero}!" }
-      ]
-    },
-
-    {
       "id": "space_adventure_v2",
       "title": "Space Adventure",
       "ageBand": "4-7",

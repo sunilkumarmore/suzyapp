@@ -1,13 +1,6 @@
 {
   "pages": [
     {
-      "id": "dino_01",
-      "title": "Dino",
-      "ageBand": "4-7",
-      "imageAsset": "images/coloring/dino_outline.png",
-      "maskAsset": "images/coloring/dino_mask.png"
-    },
-    {
       "id": "lion_01",
       "title": "Lion",
       "ageBand": "4-7",
