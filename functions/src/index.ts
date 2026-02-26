@@ -187,11 +187,11 @@ export const generateNarration = onRequest(
             action: "read",
             expires: Date.now() + 1000 * 60 * 60 * 24 * 30,
           });
-          res.json({ audioUrl: signedUrl, cached: true });
+          res.json({ audioUrl: signedUrl, storagePath: existingPath, cached: true });
           return;
         }
         if (typeof existingUrl === "string" && existingUrl.length > 0) {
-          res.json({ audioUrl: existingUrl, cached: true });
+          res.json({ audioUrl: existingUrl, cached: true, legacySignedUrl: true });
           return;
         }
       }
@@ -250,7 +250,7 @@ export const generateNarration = onRequest(
         { merge: true }
       );
 
-      res.json({ audioUrl: signedUrl, cached: false });
+      res.json({ audioUrl: signedUrl, storagePath, cached: false });
     } catch (e: any) {
       const status = typeof e?.status === "number" ? e.status : 500;
       console.error("Error in generateNarration:", e);
@@ -304,9 +304,12 @@ export const generateNarrationGlobal = onRequest(
       }
 
       const config = await getNarrationConfig();
-      const resolvedVoiceId =
-        (typeof voiceId === "string" && voiceId.trim().length >= 3 ? voiceId.trim() : "") ||
-        (config.defaultNarratorVoiceId ?? "");
+      const requestedVoiceId = typeof voiceId === "string" ? voiceId.trim() : "";
+      const useBackendDefault =
+        requestedVoiceId.length === 0 || requestedVoiceId.toLowerCase() === "default";
+      const resolvedVoiceId = useBackendDefault
+        ? (config.defaultNarratorVoiceId ?? "")
+        : requestedVoiceId;
       if (!resolvedVoiceId || resolvedVoiceId.length < 3) {
         res.status(400).json({ error: "Invalid voiceId" });
         return;
@@ -429,7 +432,12 @@ export const generateNarrationGlobal = onRequest(
           action: "read",
           expires: Date.now() + 1000 * 60 * 60 * 24 * 30,
         });
-        res.json({ status: "READY", audioUrl: signedUrl, cached: true });
+        res.json({
+          status: "READY",
+          audioUrl: signedUrl,
+          storagePath: existingStoragePath,
+          cached: true,
+        });
         return;
       }
 
@@ -501,7 +509,7 @@ export const generateNarrationGlobal = onRequest(
         expires: Date.now() + 1000 * 60 * 60 * 24 * 30,
       });
 
-      res.json({ status: "READY", audioUrl: signedUrl, cached: false });
+      res.json({ status: "READY", audioUrl: signedUrl, storagePath, cached: false });
     } catch (e: any) {
       const status = typeof e?.status === "number" ? e.status : 500;
       console.error("Error in generateNarrationGlobal:", e);
@@ -553,7 +561,7 @@ export const getSignedAudioUrl = onRequest(
         expires: Date.now() + 1000 * 60 * 60 * 24 * 30,
       });
 
-      res.json({ audioUrl: signedUrl });
+      res.json({ audioUrl: signedUrl, storagePath });
     } catch (e: any) {
       const status = typeof e?.status === "number" ? e.status : 500;
       console.error("Error in getSignedAudioUrl:", e);

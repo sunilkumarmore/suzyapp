@@ -238,7 +238,7 @@ class _HomeTourCloud extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 14, 14, 10),
             decoration: BoxDecoration(
               color: cloud,
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(26),
               border: Border.all(color: AppColors.outline),
               boxShadow: const [
                 BoxShadow(
@@ -288,34 +288,34 @@ class _HomeTourCloud extends StatelessWidget {
             ),
           ),
           Positioned(
-            left: 18,
-            top: -10,
-            child: _CloudBump(color: cloud, size: 26),
+            left: 26,
+            top: -8,
+            child: _CloudBump(color: cloud, size: 22),
           ),
           Positioned(
-            left: 54,
-            top: -14,
-            child: _CloudBump(color: cloud, size: 32),
-          ),
-          Positioned(
-            right: 44,
+            left: 74,
             top: -11,
-            child: _CloudBump(color: cloud, size: 28),
+            child: _CloudBump(color: cloud, size: 24),
           ),
           Positioned(
-            right: -16,
-            top: 48,
+            right: 62,
+            top: -8,
+            child: _CloudBump(color: cloud, size: 20),
+          ),
+          Positioned(
+            right: -10,
+            top: 70,
             child: Transform.rotate(
-              angle: 0.65,
-              child: _CloudBump(color: cloud, size: 20),
+              angle: 0.35,
+              child: _CloudBump(color: cloud, size: 16),
             ),
           ),
           Positioned(
-            right: -30,
-            top: 62,
+            right: -24,
+            top: 84,
             child: Transform.rotate(
-              angle: 0.65,
-              child: _CloudBump(color: cloud, size: 14),
+              angle: 0.35,
+              child: _CloudBump(color: cloud, size: 11),
             ),
           ),
         ],

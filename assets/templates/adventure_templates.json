@@ -1,7 +1,7 @@
 {
   "templates": [
     {
-      "id": "space_adventure_v2",
+      "id": "space_adventure_local_v2",
       "title": "Space Adventure",
       "ageBand": "4-7",
       "coverAsset": "images/adventure/space/space_cover.png",

@@ -133,10 +133,17 @@ Future<void> main() async {
 // ================== AUTH HELPERS ==================
 
 Future<void> ensureDevAuth() async {
-  if (!kDebugMode) return; 
+  if (!kDebugMode) return;
 
-  const email = 'dev@suzyapp.local';
-  const password = 'DevPassword123!';
+  const email = String.fromEnvironment('DEV_AUTH_EMAIL', defaultValue: '');
+  const password = String.fromEnvironment('DEV_AUTH_PASSWORD', defaultValue: '');
+  if (email.isEmpty || password.isEmpty) {
+    if (kDebugMode) {
+      debugPrint('DEV auth skipped: DEV_AUTH_EMAIL/DEV_AUTH_PASSWORD not provided.');
+    }
+    return;
+  }
+
   final auth = FirebaseAuth.instance;
 
   if (auth.currentUser?.email == email) return;

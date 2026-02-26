@@ -16,6 +16,7 @@ import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
 import '../models/coloring_page.dart';
 import '../utils/asset_path.dart';
+import '../utils/dev_log.dart';
 
 class ColoringCanvasArgs {
   final List<ColoringPage> pages;
@@ -111,25 +112,19 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
     try {
       outline = await _loadUiImage(outlinePath);
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Coloring outline load failed: $outlinePath -> $e');
-      }
+      DevLog.coloring('outline load failed: $outlinePath -> $e');
       outline = null;
     }
     try {
       mask = await _loadUiImage(maskPath);
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Coloring mask load failed: $maskPath -> $e');
-      }
+      DevLog.coloring('mask load failed: $maskPath -> $e');
       mask = null;
     }
 
     if (outline == null && mask == null) {
       _assetLoadError = 'Could not load outline or mask for this page.';
-      if (kDebugMode) {
-        debugPrint('Coloring asset load failed for page=${page.id}');
-      }
+      DevLog.coloring('asset load failed for page=${page.id}');
     }
 
     final int imgW = mask?.width ?? outline?.width ?? 1;
@@ -139,8 +134,8 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
         ? await _rgbaBytes(mask)
         : _solidRgba(imgW, imgH, const Color(0xFF000000));
 
-    if (kDebugMode && mask != null) {
-      debugPrint('mask decoded size: ${mask.width}x${mask.height}, len=${maskPixels.length}');
+    if (mask != null) {
+      DevLog.coloring('mask decoded size: ${mask.width}x${mask.height}, len=${maskPixels.length}');
     }
 
     if (outline != null) {
@@ -190,9 +185,7 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
         _undoStack.clear();
       });
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Failed to load SVG: $e');
-      }
+      DevLog.coloring('failed to load SVG: $e');
       if (!mounted) return;
       setState(() {
         _isSvg = false;
@@ -222,9 +215,7 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
   Future<Uint8List> _rgbaBytes(ui.Image img) async {
     final bytes = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
     if (bytes == null) {
-      if (kDebugMode) {
-        debugPrint('Failed to read RGBA bytes.');
-      }
+      DevLog.coloring('failed to read RGBA bytes');
       return Uint8List(0);
     }
     return bytes.buffer.asUint8List();
@@ -373,11 +364,10 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
       if (!found) return;
     }
 
-    if (kDebugMode) {
-      debugPrint(
-        'fill tap: x=$x y=$y -> tx=$tx ty=$ty imgW=$imgW imgH=$imgH idx=$idx maskLen=${mask.length} rgba=($r,$g,$b,$a)',
-      );
-    }
+    DevLog.coloring(
+      'fill tap: x=$x y=$y -> tx=$tx ty=$ty imgW=$imgW imgH=$imgH '
+      'idx=$idx maskLen=${mask.length} rgba=($r,$g,$b,$a)',
+    );
 
     // Ignore fully transparent/background taps after neighbor search.
     if (a == 0) return;
@@ -469,9 +459,7 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
       await _sfxPlayer.seek(Duration.zero);
       await _sfxPlayer.play();
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('color_fill sfx error: $e');
-      }
+      DevLog.coloring('color_fill sfx error: $e');
     }
   }
 
@@ -629,41 +617,55 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.large),
-              child: Row(
+              child: Wrap(
+                spacing: AppSpacing.medium,
+                runSpacing: AppSpacing.small,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  IconButton(
-                    onPressed:
-                        (_isSvg ? _svgUndoStack.isNotEmpty : _undoStack.isNotEmpty)
-                            ? _undo
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        onPressed:
+                            (_isSvg ? _svgUndoStack.isNotEmpty : _undoStack.isNotEmpty)
+                                ? _undo
+                                : null,
+                        icon: const Icon(Icons.undo),
+                      ),
+                      IconButton(
+                        onPressed: _reset,
+                        icon: const Icon(Icons.refresh),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        onPressed: _index > 0
+                            ? () => _pageController.previousPage(
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.easeOut,
+                                )
                             : null,
-                    icon: const Icon(Icons.undo),
+                        icon: const Icon(Icons.chevron_left),
+                      ),
+                      Text(
+                        '${_index + 1} / $total',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      IconButton(
+                        onPressed: _index < total - 1
+                            ? () => _pageController.nextPage(
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.easeOut,
+                                )
+                            : null,
+                        icon: const Icon(Icons.chevron_right),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    onPressed: _reset,
-                    icon: const Icon(Icons.refresh),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: _index > 0
-                        ? () => _pageController.previousPage(
-                              duration: const Duration(milliseconds: 250),
-                              curve: Curves.easeOut,
-                            )
-                        : null,
-                    icon: const Icon(Icons.chevron_left),
-                  ),
-                  Text('${_index + 1} / $total',
-                      style: const TextStyle(fontWeight: FontWeight.w800)),
-                  IconButton(
-                    onPressed: _index < total - 1
-                        ? () => _pageController.nextPage(
-                              duration: const Duration(milliseconds: 250),
-                              curve: Curves.easeOut,
-                            )
-                        : null,
-                    icon: const Icon(Icons.chevron_right),
-                  ),
-                  const Spacer(),
                 ],
               ),
             ),
@@ -776,11 +778,9 @@ Uint8List _fillRegion(Map<String, dynamic> args) {
       globalPainted++;
     }
   }
-  if (kDebugMode) {
-    debugPrint(
-      'fill global match: tol=$regionTol painted=$globalPainted target=($tr,$tg,$tb)',
-    );
-  }
+  DevLog.coloring(
+    'fill global match: tol=$regionTol painted=$globalPainted target=($tr,$tg,$tb)',
+  );
   if (globalPainted > 0) return out;
 
   int paintFlood(bool Function(int offset) matcher) {

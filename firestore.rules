@@ -9,17 +9,9 @@ service cloud.firestore {
       return signedIn() && ownerUid == request.auth.uid;
     }
 
-    match /users/{uid} {
-      allow read, write: if signedIn() && uid == request.auth.uid;
-    }
-    
-    // App writes user data under nested paths, e.g.:
-    // users/{uid}/settings/audio and users/{uid}/progress/...
-    match /users/{uid}/{doc=**} {
-      allow read, write: if signedIn() && uid == request.auth.uid;
-    }
-
-    // App content collections: read-only from client.
+    // ---------------------------
+    // Global app content (read-only)
+    // ---------------------------
     match /stories/{doc=**} {
       allow read: if true;
       allow write: if false;
@@ -35,6 +27,35 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---------------------------
+    // User-private app data
+    // ---------------------------
+    match /users/{uid} {
+      allow read, write: if signedIn() && uid == request.auth.uid;
+    }
+
+    match /users/{uid}/settings/{docId} {
+      allow read, write: if signedIn() && uid == request.auth.uid;
+    }
+
+    match /users/{uid}/progress/{docId} {
+      allow read, write: if signedIn() && uid == request.auth.uid;
+    }
+
+    match /users/{uid}/personalized_audio/{docId} {
+      // Client reads personalized narration metadata/paths.
+      // Writes are handled by trusted backend (Admin SDK).
+      allow read: if signedIn() && uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /users/{uid}/rate_limits/{docId} {
+      // Rate limits are backend-owned.
+      allow read: if signedIn() && uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    // Legacy/other project collections kept owner-scoped.
     match /workers/{workerId} {
       allow read: if signedIn() && isOwner(resource.data.ownerUid);
       allow create: if signedIn() && isOwner(request.resource.data.ownerUid);
@@ -60,6 +81,11 @@ service cloud.firestore {
       match /approvals/{approvalId} {
         allow read, write: if signedIn() && isOwner(get(/databases/$(database)/documents/jobs/$(jobId)).data.ownerUid);
       }
+    }
+
+    // Explicitly deny everything else.
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

@@ -12,6 +12,7 @@ import 'package:just_audio/just_audio.dart';
 
 import 'package:suzyapp/Services/parent_voice_service.dart';
 import 'package:suzyapp/utils/asset_path.dart';
+import 'package:suzyapp/utils/dev_log.dart';
 
 import '../design_system/app_colors.dart';
 import '../design_system/app_radius.dart';
@@ -83,13 +84,15 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
   bool _readAloudEnabled = false;
   bool _isPlayingAudio = false;
   bool _isSpeakingTts = false;
+  String? _audioStatusMessage;
+  Timer? _audioStatusTimer;
 
   // Hardening flags (prevents re-entry + repeated failures)
   bool _isReadAloudBusy = false;
   bool _parentVoiceDegraded = false; // once true, skip parent voice for this session
 
-  bool _swipeHintSeen = false; // show hint only once per install/session
-  bool _showSwipeHint = true;
+  bool _swipeHintSeen = true; // disabled: swipe hint hidden
+  bool _showSwipeHint = false; // disabled: swipe hint hidden
   bool _userHasSwiped = false;
   bool _choiceLocked = false;
   int? _selectedChoiceIdx;
@@ -112,6 +115,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
     );
     _narratorService = ParentVoiceService(
       generateEndpoint: 'https://us-central1-suzyapp.cloudfunctions.net/generateNarrationGlobal',
+      signedUrlEndpoint: 'https://us-central1-suzyapp.cloudfunctions.net/getSignedAudioUrl',
     );
 
     _loadParentVoiceSettings(); // loads toggle + voiceId
@@ -126,18 +130,23 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
     _tts.setStartHandler(() => mounted ? setState(() => _isSpeakingTts = true) : null);
     _tts.setCompletionHandler(() => mounted ? setState(() => _isSpeakingTts = false) : null);
     _tts.setCancelHandler(() => mounted ? setState(() => _isSpeakingTts = false) : null);
-    _tts.setErrorHandler((_) => mounted ? setState(() => _isSpeakingTts = false) : null);
+    _tts.setErrorHandler((_) {
+      if (!mounted) return;
+      setState(() => _isSpeakingTts = false);
+      _showAudioStatus('Text-to-speech is unavailable right now.');
+    });
 
     // Kid-friendly defaults
     _tts.setSpeechRate(0.45);
     _tts.setPitch(1.05);
     _tts.setVolume(1.0);
 
-    _autoDismissSwipeHint();
+    // Swipe hint intentionally disabled.
   }
 
   @override
   void dispose() {
+    _audioStatusTimer?.cancel();
     _stopAllAudio(); // stop before dispose
     _player.dispose();
     _sfxPlayer.dispose();
@@ -149,9 +158,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
 
   Future<void> _loadParentVoiceSettings() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (kDebugMode) {
-      debugPrint('AUTH user=$user uid=${user?.uid} email=${user?.email}');
-    }
+    DevLog.narration('AUTH user=$user uid=${user?.uid} email=${user?.email}');
     if (user == null) return;
 
     final doc = await FirebaseFirestore.instance.doc('users/${user.uid}/settings/audio').get();
@@ -196,11 +203,10 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
           : _backendDefaultNarratorVoiceId;
     });
 
-    if (kDebugMode) {
-      debugPrint(
-        'ParentVoice settings loaded: enabled=$_parentVoiceEnabled voiceId=$_parentVoiceId',
-      );
-    }
+    DevLog.narration(
+      'settings loaded: parentEnabled=$_parentVoiceEnabled '
+      'parentVoice=$_parentVoiceId mode=$_narrationMode narrator=$_narratorVoiceId',
+    );
   }
 
   // ---------- Audio helpers ----------
@@ -227,7 +233,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
       await _sfxPlayer.seek(Duration.zero);
       await _sfxPlayer.play();
     } catch (e) {
-      debugPrint('Page flip sfx error: $e');
+      DevLog.narration('page flip sfx error: $e');
     }
   }
 
@@ -239,6 +245,27 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
       await _player.setFilePath(file.path);
     }
     await _player.play();
+  }
+
+  void _clearAudioStatus() {
+    _audioStatusTimer?.cancel();
+    _audioStatusTimer = null;
+    if (!mounted) return;
+    if (_audioStatusMessage == null) return;
+    setState(() => _audioStatusMessage = null);
+  }
+
+  void _showAudioStatus(
+    String message, {
+    Duration duration = const Duration(seconds: 4),
+  }) {
+    _audioStatusTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _audioStatusMessage = message);
+    _audioStatusTimer = Timer(duration, () {
+      if (!mounted) return;
+      setState(() => _audioStatusMessage = null);
+    });
   }
 
   String _langForBackend(String storyLang) {
@@ -279,7 +306,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
 
     final cached = _narratorUrlCache[key];
     if (cached != null && cached.isNotEmpty) {
-      debugPrint('Narrator cache hit: ${story.id} page=${page.index}');
+      DevLog.narration('cache hit: ${story.id} page=${page.index}');
       return cached;
     }
 
@@ -297,14 +324,14 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
       );
 
       if (url != null && url.trim().isNotEmpty) {
-        debugPrint('Narrator generated: ${story.id} page=${page.index}');
+        DevLog.narration('generated: ${story.id} page=${page.index}');
         _narratorUrlCache[key] = url.trim();
         return url.trim();
       }
-      debugPrint('Narrator pending (202): ${story.id} page=${page.index}');
+      DevLog.narration('pending(202): ${story.id} page=${page.index}');
       return null;
     } catch (_) {
-      debugPrint('Narrator error; cooldown set: ${story.id} page=${page.index}');
+      DevLog.narration('error; cooldown set: ${story.id} page=${page.index}');
       _narratorCooldownUntil = DateTime.now().add(const Duration(minutes: 3));
       return null;
     }
@@ -336,9 +363,14 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
     unawaited(_getNarratorUrl(story: story, page: nextPage));
   }
 
-  Future<void> _playReadAloud(Story story, StoryPage page) async {
+  Future<void> _playReadAloud(
+    Story story,
+    StoryPage page, {
+    bool allowAutoRetry = true,
+  }) async {
     if (_isReadAloudBusy) return;
     _isReadAloudBusy = true;
+    var shouldAutoRetry = false;
 
     try {
       await _stopAllAudio();
@@ -347,6 +379,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
       if (pageUrl != null && pageUrl.trim().isNotEmpty) {
         try {
           await _playUrl(pageUrl.trim());
+          _clearAudioStatus();
           _prefetchNextNarrator(story);
           return;
         } catch (_) {}
@@ -355,15 +388,18 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
       final narratorUrl = await _getNarratorUrl(story: story, page: page);
       if (narratorUrl != null && narratorUrl.isNotEmpty) {
         await _playUrl(narratorUrl);
+        _clearAudioStatus();
         _prefetchNextNarrator(story);
         return;
       }
       // If narrator is still generating (202 path), retry a few times before
       // dropping to fallback audio sources.
       if (_narrationMode == 'narrator') {
+        _showAudioStatus('Preparing narration...');
         final narratorRetryUrl = await _waitForNarratorUrl(story: story, page: page);
         if (narratorRetryUrl != null && narratorRetryUrl.isNotEmpty) {
           await _playUrl(narratorRetryUrl);
+          _clearAudioStatus();
           _prefetchNextNarrator(story);
           return;
         }
@@ -406,6 +442,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
 
           if (personalizedUrl != null && personalizedUrl.trim().isNotEmpty) {
             await _playUrl(personalizedUrl.trim());
+            _clearAudioStatus();
             _prefetchNextNarrator(story);
             return;
           }
@@ -420,6 +457,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
           );
           if (generatedUrl != null && generatedUrl.trim().isNotEmpty) {
             await _playUrl(generatedUrl.trim());
+            _clearAudioStatus();
             _prefetchNextNarrator(story);
             return;
           }
@@ -433,6 +471,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
         try {
           await _player.setAsset(asset);
           await _player.play();
+          _clearAudioStatus();
           _prefetchNextNarrator(story);
           return;
         } catch (_) {}
@@ -443,10 +482,24 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
           final lang = story.language.toLowerCase();
           await _tts.setLanguage(lang == 'te' ? 'te-IN' : 'en-US');
           await _tts.speak(page.text);
+          _showAudioStatus('Using basic device voice.');
         }
-      } catch (_) {}
+      } catch (_) {
+        _showAudioStatus('Audio is unavailable right now.');
+        shouldAutoRetry = allowAutoRetry;
+      }
     } finally {
       _isReadAloudBusy = false;
+    }
+
+    if (shouldAutoRetry) {
+      _showAudioStatus('Retrying audio...');
+      await Future.delayed(const Duration(milliseconds: 1800));
+      if (!mounted) return;
+      if (!_readAloudEnabled) return;
+      if (_storyCache?.id != story.id) return;
+      if (_pageIndex != page.index) return;
+      await _playReadAloud(story, page, allowAutoRetry: false);
     }
   }
 
@@ -659,6 +712,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
       children: [
         IconButton(
           visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
           onPressed: prev,
           icon: Icon(
             Icons.chevron_left,
@@ -685,6 +739,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
         ),
         IconButton(
           visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
           onPressed: next,
           icon: Icon(
             Icons.chevron_right,
@@ -955,6 +1010,23 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
                   Text('Reading aloud…'),
                 ],
               ),
+            ] else if (_audioStatusMessage != null) ...[
+              const SizedBox(height: AppSpacing.small),
+              Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _audioStatusMessage!,
+                      style: TextStyle(
+                        color: AppColors.textSecondary.withOpacity(0.95),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ],
         ),
@@ -1140,10 +1212,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
 
         final p = story.pages[real];
         if (!p.hasChoices) {
-          final nextReal = real + 1;
-          if (nextReal < story.pages.length && _path.last != nextReal) {
-            setState(() => _path.add(nextReal));
-          }
+          _maybeAppendLinear(story, real);
         }
 
         unawaited(_saveReadingProgress());
@@ -1501,15 +1570,18 @@ class _SwipeHintState extends State<_SwipeHint> with SingleTickerProviderStateMi
         final t = _c.value;
         return Opacity(
           opacity: 0.35 + (0.35 * t),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Icon(Icons.chevron_left, size: 30),
-              SizedBox(width: 8),
-              Icon(Icons.swipe, size: 22),
-              SizedBox(width: 8),
-              Icon(Icons.chevron_right, size: 30),
-            ],
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(Icons.chevron_left, size: 30),
+                SizedBox(width: 8),
+                Icon(Icons.swipe, size: 22),
+                SizedBox(width: 8),
+                Icon(Icons.chevron_right, size: 30),
+              ],
+            ),
           ),
         );
       },

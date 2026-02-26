@@ -1,0 +1,33 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Public read-only coloring assets.
+    // App fetches these directly from client.
+    match /coloring_pages/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // User-private personalized narration files.
+    // Backend (Admin SDK) writes these; owner can read directly if needed.
+    match /users/{uid}/personalized_audio/{allPaths=**} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // Global narration cache is backend-owned.
+    // Clients access via signed URLs minted by backend.
+    match /narration_cache/{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // Deny all other storage paths.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

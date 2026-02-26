@@ -661,67 +661,112 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
                 Positioned.fill(
                   child: Container(
                     color: Colors.black.withOpacity(0.55),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 420),
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: AppSpacing.large),
-                          padding: const EdgeInsets.all(AppSpacing.large),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(AppRadius.large),
-                            border: Border.all(color: AppColors.outline),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: AppColors.shadow,
-                                blurRadius: 18,
-                                offset: Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Parent Voice',
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                              const SizedBox(height: AppSpacing.small),
-                              const Text(
-                                'Record a short sample so your child can hear your voice. ',
-                              ),
-                              const SizedBox(height: AppSpacing.small),
-                              const Text(
-                                'Tip: Use a quiet room and speak naturally for one minute.',
-                                style: TextStyle(color: AppColors.textSecondary),
-                              ),
-                              const SizedBox(height: AppSpacing.medium),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: OutlinedButton(
-                                      onPressed: _dismissTour,
-                                      child: const Text('Got it'),
+                    child: SafeArea(
+                      child: LayoutBuilder(
+                        builder: (context, c) {
+                          return SingleChildScrollView(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.large,
+                              vertical: AppSpacing.medium,
+                            ),
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(minHeight: c.maxHeight - AppSpacing.large),
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(maxWidth: 420),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(AppSpacing.large),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surface,
+                                      borderRadius: BorderRadius.circular(AppRadius.large),
+                                      border: Border.all(color: AppColors.outline),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: AppColors.shadow,
+                                          blurRadius: 18,
+                                          offset: Offset(0, 8),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Parent Voice',
+                                          style: Theme.of(context).textTheme.titleLarge,
+                                        ),
+                                        const SizedBox(height: AppSpacing.small),
+                                        const Text(
+                                          'Record a short sample so your child can hear your voice.',
+                                        ),
+                                        const SizedBox(height: AppSpacing.small),
+                                        const Text(
+                                          'Tip: Use a quiet room and speak naturally for one minute.',
+                                          style: TextStyle(color: AppColors.textSecondary),
+                                        ),
+                                        const SizedBox(height: AppSpacing.medium),
+                                        LayoutBuilder(
+                                          builder: (context, btnC) {
+                                            final stacked = btnC.maxWidth < 310;
+                                            if (stacked) {
+                                              return Column(
+                                                children: [
+                                                  SizedBox(
+                                                    width: double.infinity,
+                                                    child: OutlinedButton(
+                                                      onPressed: _dismissTour,
+                                                      child: const Text('Got it'),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: AppSpacing.small),
+                                                  SizedBox(
+                                                    width: double.infinity,
+                                                    child: ElevatedButton(
+                                                      onPressed: () async {
+                                                        await _dismissTour();
+                                                        if (mounted) {
+                                                          await _openRecordDialog();
+                                                        }
+                                                      },
+                                                      child: const Text('Record now'),
+                                                    ),
+                                                  ),
+                                                ],
+                                              );
+                                            }
+                                            return Row(
+                                              children: [
+                                                Expanded(
+                                                  child: OutlinedButton(
+                                                    onPressed: _dismissTour,
+                                                    child: const Text('Got it'),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: AppSpacing.small),
+                                                Expanded(
+                                                  child: ElevatedButton(
+                                                    onPressed: () async {
+                                                      await _dismissTour();
+                                                      if (mounted) {
+                                                        await _openRecordDialog();
+                                                      }
+                                                    },
+                                                    child: const Text('Record now'),
+                                                  ),
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(width: AppSpacing.small),
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: () async {
-                                        await _dismissTour();
-                                        if (mounted) {
-                                          await _openRecordDialog();
-                                        }
-                                      },
-                                      child: const Text('Record now'),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
-                            ],
-                          ),
-                        ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),

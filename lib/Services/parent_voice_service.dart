@@ -88,9 +88,22 @@ class ParentVoiceService {
 
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
 
+    final storagePath = data['storagePath'];
+    if (storagePath is String &&
+        storagePath.trim().isNotEmpty &&
+        signedUrlEndpoint != null &&
+        signedUrlEndpoint!.isNotEmpty) {
+      try {
+        final signed = await getSignedUrl(storagePath: storagePath.trim());
+        if (signed != null && signed.trim().isNotEmpty) return signed.trim();
+      } catch (_) {
+        // Fall back to direct URL parsing below.
+      }
+    }
+
     // Support both:
     // { audioUrl: "..." }
-    // { status: "READY", audioUrl: "..." }
+    // { status: "READY", audioUrl: "...", storagePath: "..." }
     final url = data['audioUrl'];
     if (url is String && url.trim().isNotEmpty) return url.trim();
 
