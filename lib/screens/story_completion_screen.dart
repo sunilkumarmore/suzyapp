@@ -87,14 +87,14 @@ class StoryCompletionScreen extends StatelessWidget {
                       width: double.infinity,
                       height: 56,
                       child: OutlinedButton(
-                       onPressed: () {
-  Navigator.pushNamedAndRemoveUntil(
-    context,
-    '/reader',
-    (route) => route.isFirst, // keep Home below
-    arguments: StoryReaderArgs(args.storyId, startPageIndex: 0),
-  );
-},
+                        onPressed: () {
+                          Navigator.pushNamedAndRemoveUntil(
+                            context,
+                            '/reader',
+                            (route) => route.isFirst,
+                            arguments: StoryReaderArgs(args.storyId, startPageIndex: 0),
+                          );
+                        },
                         child: const Text('Read Again'),
                       ),
                     ),
@@ -130,6 +130,18 @@ class _CelebrationStarsState extends State<_CelebrationStars>
 
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.of(context).disableAnimations) {
+      return const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.star, size: 42, color: AppColors.primaryYellow),
+          SizedBox(width: 10),
+          Icon(Icons.auto_awesome, size: 54, color: AppColors.accentCoral),
+          SizedBox(width: 10),
+          Icon(Icons.star, size: 42, color: AppColors.primaryBlue),
+        ],
+      );
+    }
     return AnimatedBuilder(
       animation: _c,
       builder: (context, _) {

@@ -8,6 +8,7 @@ import '../design_system/app_colors.dart';
 import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
 import '../design_system/app_typography.dart';
+import '../utils/child_name.dart';
 
 import '../models/reading_progress.dart';
 import '../repositories/progress_repository.dart';
@@ -33,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ReadingProgress? _progress;
   bool _showHomeTour = false;
   String _appVersionLabel = '';
+  String _childName = 'there';
 
   @override
   void initState() {
@@ -40,6 +42,77 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadProgress();
     _loadHomeTour();
     _loadVersionLabel();
+    _loadChildName();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAskChildName());
+  }
+
+  Future<void> _loadChildName() async {
+    final name = await loadChildName();
+    if (!mounted) return;
+    if (name != null) setState(() => _childName = name);
+  }
+
+  Future<void> _maybeAskChildName() async {
+    final existing = await loadChildName();
+    if (existing != null) return;
+    if (!mounted) return;
+    await _promptForChildName(isFirstTime: true);
+  }
+
+  Future<void> _promptForChildName({bool isFirstTime = false}) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: !isFirstTime,
+      builder: (context) => AlertDialog(
+        title: Text(isFirstTime ? 'Welcome to Suzy!' : 'Change name'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isFirstTime
+                  ? "What's your child's name?"
+                  : "Update your child's name.",
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: AppSpacing.medium),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              maxLength: 30,
+              decoration: const InputDecoration(
+                hintText: 'e.g. Lily',
+                counterText: '',
+              ),
+              onSubmitted: (v) {
+                if (v.trim().isNotEmpty) Navigator.pop(context, v.trim());
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, null),
+            child: Text(isFirstTime ? 'Skip' : 'Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final v = controller.text.trim();
+              if (v.isNotEmpty) Navigator.pop(context, v);
+            },
+            child: Text(isFirstTime ? "Let's go!" : 'Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result != null && result.isNotEmpty) {
+      await saveChildName(result);
+      if (!mounted) return;
+      setState(() => _childName = result);
+    }
   }
 
   Future<void> _loadProgress() async {
@@ -82,27 +155,30 @@ class _HomeScreenState extends State<HomeScreen> {
     final isTablet = w > AppBreakpoints.phoneMaxWidth;
     final tourRight = (w - 300).clamp(8.0, AppSpacing.large + 64).toDouble();
     final tourMaxWidth = (w - tourRight - 16).clamp(190.0, 270.0).toDouble();
-    final parentBtn = InkWell(
-      borderRadius: BorderRadius.circular(AppRadius.large),
-      onTap: _openParentSummary,
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.large),
-          border: Border.all(color: AppColors.outline),
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Icon(Icons.pets, color: AppColors.textPrimary),
-            Positioned(
-              bottom: 8,
-              right: 8,
-              child: Icon(Icons.lock, size: 12, color: AppColors.textPrimary),
-            ),
-          ],
+    final parentBtn = Tooltip(
+      message: 'Parent settings',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.large),
+        onTap: _openParentSummary,
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.large),
+            border: Border.all(color: AppColors.outline),
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Icon(Icons.pets, color: AppColors.textPrimary),
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: Icon(Icons.lock, size: 12, color: AppColors.textPrimary),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -119,7 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Align(alignment: Alignment.topRight, child: parentBtn),
                   const SizedBox(height: AppSpacing.small),
-                  const _Header(childName: 'Kiddo'),
+                  _Header(childName: _childName),
                   SizedBox(
                     height: isTablet ? AppSpacing.large : AppSpacing.medium,
                   ),

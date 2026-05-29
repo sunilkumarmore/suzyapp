@@ -38,6 +38,19 @@ service cloud.firestore {
       allow read, write: if signedIn() && uid == request.auth.uid;
     }
 
+    match /users/{uid}/settings/audio {
+      allow read: if signedIn() && uid == request.auth.uid;
+      allow write: if signedIn() && uid == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+             'parentVoiceEnabled', 'elevenVoiceId',
+             'elevenlabsSettings', 'updatedAt'
+           ])
+        && (!('parentVoiceEnabled' in request.resource.data)
+            || request.resource.data.parentVoiceEnabled is bool)
+        && (!('elevenVoiceId' in request.resource.data)
+            || request.resource.data.elevenVoiceId is string);
+    }
+
     match /users/{uid}/progress/{docId} {
       allow read, write: if signedIn() && uid == request.auth.uid;
     }

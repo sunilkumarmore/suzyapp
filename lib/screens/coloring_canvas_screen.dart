@@ -627,6 +627,7 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
+                        tooltip: 'Undo',
                         onPressed:
                             (_isSvg ? _svgUndoStack.isNotEmpty : _undoStack.isNotEmpty)
                                 ? _undo
@@ -634,6 +635,7 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
                         icon: const Icon(Icons.undo),
                       ),
                       IconButton(
+                        tooltip: 'Reset',
                         onPressed: _reset,
                         icon: const Icon(Icons.refresh),
                       ),
@@ -643,6 +645,7 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
+                        tooltip: 'Previous page',
                         onPressed: _index > 0
                             ? () => _pageController.previousPage(
                                   duration: const Duration(milliseconds: 250),
@@ -656,6 +659,7 @@ class _ColoringCanvasScreenState extends State<ColoringCanvasScreen>
                         style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
                       IconButton(
+                        tooltip: 'Next page',
                         onPressed: _index < total - 1
                             ? () => _pageController.nextPage(
                                   duration: const Duration(milliseconds: 250),

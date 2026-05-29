@@ -7,6 +7,7 @@ import '../design_system/app_spacing.dart';
 import '../models/reading_progress.dart';
 import '../models/story_progress.dart';
 import '../repositories/progress_repository.dart';
+import '../utils/child_name.dart';
 
 class ParentSummaryScreen extends StatefulWidget {
   final ProgressRepository progressRepository;
@@ -19,9 +20,14 @@ class ParentSummaryScreen extends StatefulWidget {
 
 class _ParentSummaryScreenState extends State<ParentSummaryScreen> {
   late Future<_ParentSummaryVM> _future;
+  String _childName = '';
+
   @override
   void initState() {
     super.initState();
+    loadChildName().then((name) {
+      if (mounted) setState(() => _childName = name ?? '');
+    });
 
     // 🔐 Hard gate: prevents route deep-link access on web
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -69,6 +75,93 @@ class _ParentSummaryScreenState extends State<ParentSummaryScreen> {
     final hh = dt.hour.toString().padLeft(2, '0');
     final mm = dt.minute.toString().padLeft(2, '0');
     return '$y-$m-$d  $hh:$mm';
+  }
+
+  Future<void> _editChildName() async {
+    final controller = TextEditingController(text: _childName);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Child's name"),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          maxLength: 30,
+          decoration: const InputDecoration(
+            hintText: 'e.g. Lily',
+            counterText: '',
+          ),
+          onSubmitted: (v) {
+            if (v.trim().isNotEmpty) Navigator.pop(context, v.trim());
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, null),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final v = controller.text.trim();
+              if (v.isNotEmpty) Navigator.pop(context, v);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result != null && result.isNotEmpty) {
+      await saveChildName(result);
+      if (!mounted) return;
+      setState(() => _childName = result);
+    }
+  }
+
+  Widget _buildChildNameCard() {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.large),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.large),
+        border: Border.all(color: AppColors.outline),
+        boxShadow: const [
+          BoxShadow(color: AppColors.shadow, blurRadius: 18, offset: Offset(0, 8)),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.child_care, color: AppColors.textSecondary),
+          const SizedBox(width: AppSpacing.medium),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Child's Name",
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _childName.isEmpty ? 'Not set' : _childName,
+                  style: TextStyle(
+                    color: _childName.isEmpty
+                        ? AppColors.textSecondary
+                        : AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, size: 20),
+            onPressed: _editChildName,
+            tooltip: 'Edit name',
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildParentVoiceCard(BuildContext context) {
@@ -163,6 +256,8 @@ class _ParentSummaryScreenState extends State<ParentSummaryScreen> {
 
             return ListView(
               children: [
+                _buildChildNameCard(),
+                const SizedBox(height: AppSpacing.medium),
                 _buildParentVoiceCard(context),
                 const SizedBox(height: AppSpacing.large),
                 _Card(

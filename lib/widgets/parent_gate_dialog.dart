@@ -22,6 +22,7 @@ Future<bool> showParentGate(BuildContext context, {bool force = false}) async {
               controller: controller,
               keyboardType: TextInputType.number,
               autofocus: true,
+              decoration: const InputDecoration(hintText: 'Your answer'),
             ),
           ],
         ),

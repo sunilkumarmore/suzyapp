@@ -40,7 +40,13 @@ class AssetPath {
         return 'https://firebasestorage.googleapis.com/v0/b/$bucket/o/$encodedObject?alt=media';
       }
     }
-    if (isRemote(p)) return p;
+    if (isRemote(p)) {
+      // Upgrade insecure HTTP to HTTPS to prevent MITM on untrusted networks.
+      if (p.toLowerCase().startsWith('http://')) {
+        return 'https://${p.substring(7)}';
+      }
+      return p;
+    }
 
     // Convert backslashes (Windows) to forward slashes
     p = p.replaceAll('\\', '/');
