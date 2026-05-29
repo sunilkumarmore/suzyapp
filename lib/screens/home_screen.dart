@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:suzyapp/widgets/parent_gate_dialog.dart';
@@ -9,6 +8,7 @@ import '../design_system/app_colors.dart';
 import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
 import '../design_system/app_typography.dart';
+import '../utils/child_name.dart';
 
 import '../models/reading_progress.dart';
 import '../repositories/progress_repository.dart';
@@ -34,7 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ReadingProgress? _progress;
   bool _showHomeTour = false;
   String _appVersionLabel = '';
-  String _childName = 'Kiddo';
+  String _childName = 'there';
 
   @override
   void initState() {
@@ -43,12 +43,75 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadHomeTour();
     _loadVersionLabel();
     _loadChildName();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAskChildName());
   }
 
-  void _loadChildName() {
-    final name = FirebaseAuth.instance.currentUser?.displayName;
-    if (name != null && name.trim().isNotEmpty) {
-      setState(() => _childName = name.trim());
+  Future<void> _loadChildName() async {
+    final name = await loadChildName();
+    if (!mounted) return;
+    if (name != null) setState(() => _childName = name);
+  }
+
+  Future<void> _maybeAskChildName() async {
+    final existing = await loadChildName();
+    if (existing != null) return;
+    if (!mounted) return;
+    await _promptForChildName(isFirstTime: true);
+  }
+
+  Future<void> _promptForChildName({bool isFirstTime = false}) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: !isFirstTime,
+      builder: (context) => AlertDialog(
+        title: Text(isFirstTime ? 'Welcome to Suzy!' : 'Change name'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isFirstTime
+                  ? "What's your child's name?"
+                  : "Update your child's name.",
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: AppSpacing.medium),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              maxLength: 30,
+              decoration: const InputDecoration(
+                hintText: 'e.g. Lily',
+                counterText: '',
+              ),
+              onSubmitted: (v) {
+                if (v.trim().isNotEmpty) Navigator.pop(context, v.trim());
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, null),
+            child: Text(isFirstTime ? 'Skip' : 'Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final v = controller.text.trim();
+              if (v.isNotEmpty) Navigator.pop(context, v);
+            },
+            child: Text(isFirstTime ? "Let's go!" : 'Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result != null && result.isNotEmpty) {
+      await saveChildName(result);
+      if (!mounted) return;
+      setState(() => _childName = result);
     }
   }
 
