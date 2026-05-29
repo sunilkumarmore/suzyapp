@@ -130,6 +130,18 @@ class _CelebrationStarsState extends State<_CelebrationStars>
 
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.of(context).disableAnimations) {
+      return const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.star, size: 42, color: AppColors.primaryYellow),
+          SizedBox(width: 10),
+          Icon(Icons.auto_awesome, size: 54, color: AppColors.accentCoral),
+          SizedBox(width: 10),
+          Icon(Icons.star, size: 42, color: AppColors.primaryBlue),
+        ],
+      );
+    }
     return AnimatedBuilder(
       animation: _c,
       builder: (context, _) {

@@ -155,27 +155,30 @@ class _HomeScreenState extends State<HomeScreen> {
     final isTablet = w > AppBreakpoints.phoneMaxWidth;
     final tourRight = (w - 300).clamp(8.0, AppSpacing.large + 64).toDouble();
     final tourMaxWidth = (w - tourRight - 16).clamp(190.0, 270.0).toDouble();
-    final parentBtn = InkWell(
-      borderRadius: BorderRadius.circular(AppRadius.large),
-      onTap: _openParentSummary,
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.large),
-          border: Border.all(color: AppColors.outline),
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Icon(Icons.pets, color: AppColors.textPrimary),
-            Positioned(
-              bottom: 8,
-              right: 8,
-              child: Icon(Icons.lock, size: 12, color: AppColors.textPrimary),
-            ),
-          ],
+    final parentBtn = Tooltip(
+      message: 'Parent settings',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.large),
+        onTap: _openParentSummary,
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.large),
+            border: Border.all(color: AppColors.outline),
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Icon(Icons.pets, color: AppColors.textPrimary),
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: Icon(Icons.lock, size: 12, color: AppColors.textPrimary),
+              ),
+            ],
+          ),
         ),
       ),
     );

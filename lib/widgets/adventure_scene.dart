@@ -10,6 +10,7 @@ class AdventureScene extends StatelessWidget {
   final String? friendAsset; // optional
   final String? objectAsset; // optional
   final String? emotionEmoji; // optional "😊"
+  final String? semanticLabel;
 
   const AdventureScene({
     super.key,
@@ -18,6 +19,7 @@ class AdventureScene extends StatelessWidget {
     this.friendAsset,
     this.objectAsset,
     this.emotionEmoji,
+    this.semanticLabel,
   });
 
   @override
@@ -26,7 +28,11 @@ class AdventureScene extends StatelessWidget {
     final hero = AssetPath.normalize(heroAsset);
     final friend = AssetPath.normalize(friendAsset);
     final obj = AssetPath.normalize(objectAsset);
-    return AspectRatio(
+    return Semantics(
+      label: semanticLabel ?? 'Story illustration',
+      image: true,
+      excludeSemantics: true,
+      child: AspectRatio(
       // keeps scene proportions stable across devices
       aspectRatio: 4 / 3,
       child: ClipRRect(
@@ -101,6 +107,7 @@ class AdventureScene extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 

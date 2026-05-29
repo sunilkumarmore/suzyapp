@@ -66,8 +66,10 @@ class _ReadToMeButtonState extends State<ReadToMeButton>
     final label = widget.enabled ? 'Stop' : 'Read to Me';
     final icon = widget.enabled ? Icons.stop_circle : Icons.volume_up_rounded;
 
-    // Gentle idle pulse: 1.00 -> 1.03 scale
-    final scale = 1.0 + (_pulse.value * 0.03);
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+
+    // Gentle idle pulse: 1.00 -> 1.03 scale (skipped when reduce-motion is on)
+    final scale = reduceMotion ? 1.0 : 1.0 + (_pulse.value * 0.03);
 
     // Glow when playing
     final glow = widget.isPlaying;
@@ -153,6 +155,11 @@ class _DotWaveState extends State<_DotWave> with SingleTickerProviderStateMixin 
 
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.of(context).disableAnimations) {
+      return Row(
+        children: [_dot(1.0), _dot(1.0), _dot(1.0)],
+      );
+    }
     return AnimatedBuilder(
       animation: _c,
       builder: (_, __) {

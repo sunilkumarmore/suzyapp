@@ -716,6 +716,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
         IconButton(
           visualDensity: VisualDensity.compact,
           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          tooltip: 'Previous page',
           onPressed: prev,
           icon: Icon(
             Icons.chevron_left,
@@ -743,6 +744,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
         IconButton(
           visualDensity: VisualDensity.compact,
           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          tooltip: 'Next page',
           onPressed: next,
           icon: Icon(
             Icons.chevron_right,
