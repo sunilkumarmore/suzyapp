@@ -151,7 +151,7 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
     }
     _creatingVoice = true;
     try {
-      setStatus('Creating voice?');
+      setStatus('Creating voice…');
       debugPrint(
         'ParentVoice:createVoiceFromBytes bytes=${bytes.length} mime=$mimeType',
       );
@@ -191,8 +191,8 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
     }
 
     debugPrint('ParentVoice: openRecordDialog (mobile)');
-    bool started = false;
     bool isRecording = false;
+    bool isCreating = false;
     int elapsed = 0;
     String? localStatus;
     String? localPath;
@@ -224,11 +224,13 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
           return;
         }
         debugPrint('ParentVoice: bytes read=${bytes.length}');
+        setState(() => isCreating = true);
         await _createVoiceFromBytes(
           bytes: bytes,
           mimeType: 'audio/m4a',
           setStatus: (s) => setState(() => localStatus = s),
         );
+        setState(() => isCreating = false);
       }
     }
 
@@ -279,18 +281,14 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            if (!started) {
-              started = true;
-              unawaited(startRecording(setState));
-            }
-
             return WillPopScope(
               onWillPop: () async {
+                if (isCreating) return false;
                 await stopRecording(setState);
                 return true;
               },
               child: AlertDialog(
-                title: const Text('Recording'),
+                title: const Text('Record Your Voice'),
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -305,9 +303,17 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
                           child: Text(
                             isRecording
                                 ? 'Recording… ${_formatSeconds(elapsed)} / 1:00'
-                                : 'Not recording',
+                                : isCreating
+                                    ? 'Processing…'
+                                    : 'Ready to record',
                           ),
                         ),
+                        if (isCreating)
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.medium),
@@ -321,31 +327,29 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
                         style: const TextStyle(color: AppColors.textSecondary),
                       ),
                     ],
-                    if (!isRecording && localPath != null) ...[
-                      const SizedBox(height: AppSpacing.small),
-                      Text(
-                        'Saved to: $localPath',
-                        style: const TextStyle(color: AppColors.textSecondary),
-                      ),
-                    ],
                   ],
                 ),
                 actions: [
-                  TextButton(
-                    onPressed: isRecording
-                        ? () async {
-                            await stopRecording(setState);
-                          }
-                        : null,
-                    child: const Text('Stop'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () async {
-                      await stopRecording(setState);
-                      if (mounted) Navigator.pop(context);
-                    },
-                    child: const Text('Close'),
-                  ),
+                  if (!isRecording && !isCreating && localStatus == null)
+                    ElevatedButton(
+                      onPressed: () => unawaited(startRecording(setState)),
+                      child: const Text('Start'),
+                    ),
+                  if (isRecording)
+                    TextButton(
+                      onPressed: () async {
+                        await stopRecording(setState);
+                      },
+                      child: const Text('Stop'),
+                    ),
+                  if (!isCreating)
+                    TextButton(
+                      onPressed: () async {
+                        if (isRecording) await stopRecording(setState);
+                        if (mounted) Navigator.pop(context);
+                      },
+                      child: const Text('Close'),
+                    ),
                 ],
               ),
             );
@@ -357,8 +361,8 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
 
   Future<void> _openWebRecordDialog() async {
     debugPrint('ParentVoice: openWebRecordDialog');
-    bool started = false;
     bool isRecording = false;
+    bool isCreating = false;
     int elapsed = 0;
     String? localStatus;
     WebRecording? webRecording;
@@ -389,11 +393,13 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
         debugPrint(
           'ParentVoice(web): bytes=${rec.bytes.length} mime=${rec.mimeType} url=${rec.downloadUrl}',
         );
+        setState(() => isCreating = true);
         await _createVoiceFromBytes(
           bytes: rec.bytes,
           mimeType: rec.mimeType,
           setStatus: (s) => setState(() => localStatus = s),
         );
+        setState(() => isCreating = false);
       } else {
         debugPrint('ParentVoice(web): no recording returned');
       }
@@ -432,18 +438,14 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            if (!started) {
-              started = true;
-              unawaited(startRecording(setState));
-            }
-
             return WillPopScope(
               onWillPop: () async {
+                if (isCreating) return false;
                 await stopRecording(setState);
                 return true;
               },
               child: AlertDialog(
-                title: const Text('Recording'),
+                title: const Text('Record Your Voice'),
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -458,9 +460,17 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
                           child: Text(
                             isRecording
                                 ? 'Recording… ${_formatSeconds(elapsed)} / 1:00'
-                                : 'Not recording',
+                                : isCreating
+                                    ? 'Processing…'
+                                    : 'Ready to record',
                           ),
                         ),
+                        if (isCreating)
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.medium),
@@ -474,17 +484,22 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
                         style: const TextStyle(color: AppColors.textSecondary),
                       ),
                     ],
-                    if (!isRecording && webRecording != null) ...[
-                      const SizedBox(height: AppSpacing.small),
-                      Text(
-                        'Recording ready to download.',
-                        style: const TextStyle(color: AppColors.textSecondary),
-                      ),
-                    ],
                   ],
                 ),
                 actions: [
-                  if (!isRecording && webRecording != null)
+                  if (!isRecording && !isCreating && localStatus == null)
+                    ElevatedButton(
+                      onPressed: () => unawaited(startRecording(setState)),
+                      child: const Text('Start'),
+                    ),
+                  if (isRecording)
+                    TextButton(
+                      onPressed: () async {
+                        await stopRecording(setState);
+                      },
+                      child: const Text('Stop'),
+                    ),
+                  if (!isRecording && !isCreating && webRecording != null)
                     TextButton(
                       onPressed: () {
                         final url = webRecording?.downloadUrl;
@@ -493,21 +508,14 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
                       },
                       child: const Text('Download'),
                     ),
-                  TextButton(
-                    onPressed: isRecording
-                        ? () async {
-                            await stopRecording(setState);
-                          }
-                        : null,
-                    child: const Text('Stop'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () async {
-                      await stopRecording(setState);
-                      if (mounted) Navigator.pop(context);
-                    },
-                    child: const Text('Close'),
-                  ),
+                  if (!isCreating)
+                    TextButton(
+                      onPressed: () async {
+                        if (isRecording) await stopRecording(setState);
+                        if (mounted) Navigator.pop(context);
+                      },
+                      child: const Text('Close'),
+                    ),
                 ],
               ),
             );
@@ -604,11 +612,27 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
                             border: Border.all(color: AppColors.outline),
                           ),
                           child: Row(
-                            children: const [
-                              Icon(Icons.mic, color: AppColors.textSecondary),
-                              SizedBox(width: AppSpacing.small),
+                            children: [
+                              Icon(
+                                _voiceIdController.text.trim().isNotEmpty
+                                    ? Icons.check_circle_outline
+                                    : Icons.mic,
+                                color: _voiceIdController.text.trim().isNotEmpty
+                                    ? Colors.green
+                                    : AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: AppSpacing.small),
                               Expanded(
-                                child: Text('Placeholder: 1:00 recording clip'),
+                                child: Text(
+                                  _voiceIdController.text.trim().isNotEmpty
+                                      ? 'Voice saved'
+                                      : 'No recording yet',
+                                  style: TextStyle(
+                                    color: _voiceIdController.text.trim().isNotEmpty
+                                        ? Colors.green
+                                        : AppColors.textSecondary,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
