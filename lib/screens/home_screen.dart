@@ -9,6 +9,7 @@ import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
 import '../design_system/app_typography.dart';
 import '../utils/child_name.dart';
+import '../services/streak_service.dart';
 
 import '../models/reading_progress.dart';
 import '../repositories/progress_repository.dart';
@@ -35,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _showHomeTour = false;
   String _appVersionLabel = '';
   String _childName = 'there';
+  int _streak = 0;
 
   @override
   void initState() {
@@ -43,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadHomeTour();
     _loadVersionLabel();
     _loadChildName();
+    _loadStreak();
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAskChildName());
   }
 
@@ -50,6 +53,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final name = await loadChildName();
     if (!mounted) return;
     if (name != null) setState(() => _childName = name);
+  }
+
+  Future<void> _loadStreak() async {
+    final count = await StreakService.getStreak();
+    if (!mounted) return;
+    setState(() => _streak = count);
   }
 
   Future<void> _maybeAskChildName() async {
@@ -195,7 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Align(alignment: Alignment.topRight, child: parentBtn),
                   const SizedBox(height: AppSpacing.small),
-                  _Header(childName: _childName),
+                  _Header(childName: _childName, streak: _streak),
                   SizedBox(
                     height: isTablet ? AppSpacing.large : AppSpacing.medium,
                   ),
@@ -205,8 +214,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     subtitle: '',
                     color: AppColors.tileBlue,
                     icon: Icons.menu_book,
-                    onTap: () => Navigator.pushNamed(context, '/library')
-                        .then((_) => _loadProgress()),
+                    onTap: () => Navigator.pushNamed(context, '/library').then((_) {
+                        _loadProgress();
+                        _loadStreak();
+                      }),
                   ),
                   const SizedBox(height: AppSpacing.medium),
 
@@ -422,7 +433,9 @@ class _CloudBump extends StatelessWidget {
 
 class _Header extends StatelessWidget {
   final String childName;
-  const _Header({required this.childName});
+  final int streak;
+
+  const _Header({required this.childName, required this.streak});
 
   @override
   Widget build(BuildContext context) {
@@ -431,9 +444,31 @@ class _Header extends StatelessWidget {
       children: [
         Text('Hi, $childName!', style: AppTypography.headingLarge),
         const SizedBox(height: AppSpacing.xsmall),
-        Text(
-          'Pick a story to begin.',
-          style: AppTypography.headingSubtitle,
+        Row(
+          children: [
+            Text(
+              'Pick a story to begin.',
+              style: AppTypography.headingSubtitle,
+            ),
+            if (streak >= 1) ...[
+              const SizedBox(width: AppSpacing.small),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.accentCoral.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '🔥 $streak',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.accentCoral,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ],
     );

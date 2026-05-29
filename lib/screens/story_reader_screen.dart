@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:suzyapp/services/streak_service.dart';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -62,6 +64,11 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
   late final PageController _pageController;
   bool _pageControllerReady = false;
 
+  // Connectivity / offline banner
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+  bool _isOnline = true;
+  bool _imagesPrewarmed = false;
+
   bool _parentVoiceEnabled = false;
   String _parentVoiceId = '';
   Map<String, dynamic> _elevenlabsSettings = ParentVoiceSettings.defaults().elevenlabsSettings;
@@ -121,6 +128,25 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
 
     _loadParentVoiceSettings(); // loads toggle + voiceId
 
+    // Record streak for today (idempotent — safe to call multiple times)
+    StreakService.recordToday().catchError((_) {});
+
+    // Connectivity monitoring
+    Connectivity().checkConnectivity().then((results) {
+      if (!mounted) return;
+      setState(() => _isOnline = results.any((r) => r != ConnectivityResult.none));
+    });
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+      if (!mounted) return;
+      setState(() => _isOnline = results.any((r) => r != ConnectivityResult.none));
+    });
+
+    // Pre-warm images after story loads
+    _future.then((story) {
+      if (!mounted) return;
+      _prewarmImages(story);
+    }).catchError((_) {});
+
     // Track audio state
     _player.playerStateStream.listen((state) {
       if (!mounted) return;
@@ -154,6 +180,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
     if (_pageControllerReady) {
       _pageController.dispose();
     }
+    _connectivitySub?.cancel();
     super.dispose();
   }
 
@@ -559,6 +586,49 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
     } catch (e) {
       debugPrint('saveStoryProgress failed (offline?): $e');
     }
+  }
+
+  void _prewarmImages(Story story) {
+    if (_imagesPrewarmed) return;
+    _imagesPrewarmed = true;
+    final urls = <String>{};
+    for (final page in story.pages) {
+      for (final raw in [
+        page.backgroundAsset,
+        page.heroAsset,
+        page.friendAsset,
+        page.objectAsset,
+        page.imageUrl,
+      ]) {
+        final normalized = AssetPath.normalize(raw);
+        if (AssetPath.isRemote(normalized)) urls.add(normalized);
+      }
+    }
+    for (final url in urls) {
+      DefaultCacheManager().downloadFile(url).catchError((_) {});
+    }
+  }
+
+  Widget _buildOfflineBanner() {
+    return Container(
+      width: double.infinity,
+      color: Colors.amber.shade100,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.large, vertical: 6),
+      child: Row(
+        children: [
+          Icon(Icons.wifi_off_rounded, size: 15, color: Colors.amber.shade800),
+          const SizedBox(width: 6),
+          Text(
+            'You\'re offline — reading from cache',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.amber.shade800,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showCompletion(Story story) async {
@@ -1319,57 +1389,67 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
         elevation: 0,
         actions: const [],
       ),
-      body: FutureBuilder<Story>(
-        future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
+      body: Column(
+        children: [
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: _isOnline ? const SizedBox.shrink() : _buildOfflineBanner(),
+          ),
+          Expanded(
+            child: FutureBuilder<Story>(
+              future: _future,
+              builder: (context, snap) {
+                if (snap.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
 
-          final story = snap.data!;
-          _storyCache = story;
+                final story = snap.data!;
+                _storyCache = story;
 
-          final bool isCreatedStory = story.id.startsWith('created_');
-          if (isCreatedStory && _path.isEmpty) {
-            final startReal =
-                (widget.startPageIndex ?? 0).clamp(0, story.pages.length - 1);
-            _path = [startReal];
-            _pathPos = 0;
-            _pageIndex = startReal;
-            _pageController = PageController(initialPage: 0);
-            _pageControllerReady = true;
-          } else if (!isCreatedStory && !_pageControllerReady) {
-            _pageController = PageController(initialPage: _pageIndex);
-            _pageControllerReady = true;
-          }
+                final bool isCreatedStory = story.id.startsWith('created_');
+                if (isCreatedStory && _path.isEmpty) {
+                  final startReal =
+                      (widget.startPageIndex ?? 0).clamp(0, story.pages.length - 1);
+                  _path = [startReal];
+                  _pathPos = 0;
+                  _pageIndex = startReal;
+                  _pageController = PageController(initialPage: 0);
+                  _pageControllerReady = true;
+                } else if (!isCreatedStory && !_pageControllerReady) {
+                  _pageController = PageController(initialPage: _pageIndex);
+                  _pageControllerReady = true;
+                }
 
-          final int safeIndex = (_pageIndex.clamp(0, story.pages.length - 1) as int);
-          if (safeIndex != _pageIndex) _pageIndex = safeIndex;
+                final int safeIndex = (_pageIndex.clamp(0, story.pages.length - 1) as int);
+                if (safeIndex != _pageIndex) _pageIndex = safeIndex;
 
-          final realIndex = realIndexFor(story, isCreatedStory);
-          final page = story.pages[realIndex];
+                final realIndex = realIndexFor(story, isCreatedStory);
+                final page = story.pages[realIndex];
 
-          if (isCreatedStory) {
-            _maybeAppendLinear(story, realIndex);
-            return _buildCreatedStoryPager(story);
-          }
+                if (isCreatedStory) {
+                  _maybeAppendLinear(story, realIndex);
+                  return _buildCreatedStoryPager(story);
+                }
 
-          return Stack(
-            children: [
-              _buildStandardStoryPager(story),
-              if (_showSwipeHint && safeIndex == 0)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 82,
-                  child: const IgnorePointer(
-                    child: _SwipeHint(),
-                  ),
-                ),
-            ],
-          );
-        },
+                return Stack(
+                  children: [
+                    _buildStandardStoryPager(story),
+                    if (_showSwipeHint && safeIndex == 0)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 82,
+                        child: const IgnorePointer(
+                          child: _SwipeHint(),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
