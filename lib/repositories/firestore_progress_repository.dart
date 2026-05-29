@@ -157,21 +157,4 @@ class FirestoreProgressRepository implements ProgressRepository {
     }, SetOptions(merge: true));
   }
   
-  @override
-  Future<void> clearProgress() {
-    // TODO: implement clearProgress
-    throw UnimplementedError();
-  }
-  
-  @override
-  Future<ReadingProgress?> getLastProgress() {
-    // TODO: implement getLastProgress
-    throw UnimplementedError();
-  }
-  
-  @override
-  Future<void> saveProgress(ReadingProgress progress) {
-    // TODO: implement saveProgress
-    throw UnimplementedError();
-  }
 }

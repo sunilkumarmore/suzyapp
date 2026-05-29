@@ -87,14 +87,14 @@ class StoryCompletionScreen extends StatelessWidget {
                       width: double.infinity,
                       height: 56,
                       child: OutlinedButton(
-                       onPressed: () {
-  Navigator.pushNamedAndRemoveUntil(
-    context,
-    '/reader',
-    (route) => route.isFirst, // keep Home below
-    arguments: StoryReaderArgs(args.storyId, startPageIndex: 0),
-  );
-},
+                        onPressed: () {
+                          Navigator.pushNamedAndRemoveUntil(
+                            context,
+                            '/reader',
+                            (route) => route.isFirst,
+                            arguments: StoryReaderArgs(args.storyId, startPageIndex: 0),
+                          );
+                        },
                         child: const Text('Read Again'),
                       ),
                     ),

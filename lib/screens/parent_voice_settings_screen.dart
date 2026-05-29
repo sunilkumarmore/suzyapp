@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/app_config.dart';
 import '../design_system/app_colors.dart';
 import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
@@ -48,8 +49,8 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
     super.initState();
 
     _parentVoiceService = ParentVoiceService(
-      createEndpoint: 'https://us-central1-suzyapp.cloudfunctions.net/parentVoiceCreate',
-      generateEndpoint: 'https://us-central1-suzyapp.cloudfunctions.net/generateNarration',
+      createEndpoint: AppConfig.parentVoiceCreateEndpoint,
+      generateEndpoint: AppConfig.generateNarrationEndpoint,
     );
     _loadTourFlag();
   }
@@ -104,20 +105,6 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
     }
   }
 
-  void _test() {
-    // Intentionally not wired to ParentVoiceService here to avoid mismatched signatures.
-    // This keeps the screen compile-safe and still useful for enabling/disabling + voiceId storage.
-    if (!_localEnabled) {
-      setState(() => _status = 'Enable Parent Voice to test.');
-      return;
-    }
-    if (_voiceIdController.text.trim().isEmpty) {
-      setState(() => _status = 'Enter an ElevenLabs Voice ID first.');
-      return;
-    }
-    setState(() => _status = 'Test not wired yet (settings are saved correctly).');
-  }
-
   String _formatSeconds(int seconds) {
     final m = (seconds ~/ 60).toString().padLeft(1, '0');
     final s = (seconds % 60).toString().padLeft(2, '0');
@@ -129,15 +116,16 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
     setState(() {
       _voiceIdController.text = voiceId;
       _localEnabled = true;
-      _dirty = false;
     });
     await _repo.saveSettings(
       ParentVoiceSettings(
-        parentVoiceEnabled: _localEnabled,
+        parentVoiceEnabled: true,
         elevenVoiceId: voiceId,
         elevenlabsSettings: _elevenlabsSettings,
       ),
     );
+    if (!mounted) return;
+    setState(() => _dirty = false);
   }
 
   Future<void> _createVoiceFromBytes({
@@ -647,22 +635,9 @@ class _ParentVoiceSettingsScreenState extends State<ParentVoiceSettingsScreen> {
                   ),
                   const SizedBox(height: AppSpacing.large),
 
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _saving ? null : _test,
-                          child: const Text('Test'),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.medium),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: (_saving || !_dirty) ? null : _save,
-                          child: _saving ? const Text('Saving...') : const Text('Save'),
-                        ),
-                      ),
-                    ],
+                  ElevatedButton(
+                    onPressed: (_saving || !_dirty) ? null : _save,
+                    child: _saving ? const Text('Saving...') : const Text('Save'),
                   ),
 
                   if (_status != null) ...[

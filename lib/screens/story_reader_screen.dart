@@ -5,12 +5,13 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:just_audio/just_audio.dart';
 
 import 'package:suzyapp/Services/parent_voice_service.dart';
+import 'package:suzyapp/config/app_config.dart';
 import 'package:suzyapp/utils/asset_path.dart';
 import 'package:suzyapp/utils/dev_log.dart';
 
@@ -110,12 +111,12 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
     _future = widget.storyRepository.getStoryById(widget.storyId);
 
     _parentVoiceService = ParentVoiceService(
-      generateEndpoint: 'https://us-central1-suzyapp.cloudfunctions.net/generateNarration',
-      signedUrlEndpoint: 'https://us-central1-suzyapp.cloudfunctions.net/getSignedAudioUrl',
+      generateEndpoint: AppConfig.generateNarrationEndpoint,
+      signedUrlEndpoint: AppConfig.getSignedAudioUrlEndpoint,
     );
     _narratorService = ParentVoiceService(
-      generateEndpoint: 'https://us-central1-suzyapp.cloudfunctions.net/generateNarrationGlobal',
-      signedUrlEndpoint: 'https://us-central1-suzyapp.cloudfunctions.net/getSignedAudioUrl',
+      generateEndpoint: AppConfig.generateNarrationGlobalEndpoint,
+      signedUrlEndpoint: AppConfig.getSignedAudioUrlEndpoint,
     );
 
     _loadParentVoiceSettings(); // loads toggle + voiceId
@@ -326,6 +327,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
       if (url != null && url.trim().isNotEmpty) {
         DevLog.narration('generated: ${story.id} page=${page.index}');
         _narratorUrlCache[key] = url.trim();
+        _narratorCooldownUntil = null;
         return url.trim();
       }
       DevLog.narration('pending(202): ${story.id} page=${page.index}');
@@ -405,6 +407,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
         }
       }
 
+      _clearAudioStatus();
       final user = FirebaseAuth.instance.currentUser;
       final parentAllowed =
           _narrationMode == 'parent' || (_narrationMode == 'narrator');
@@ -534,7 +537,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
         ),
       );
     } catch (e) {
-      if (kDebugMode) debugPrint('saveProgress failed (offline?): $e');
+      debugPrint('saveProgress failed (offline?): $e');
     }
   }
 
@@ -554,7 +557,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
         ),
       );
     } catch (e) {
-      if (kDebugMode) debugPrint('saveStoryProgress failed (offline?): $e');
+      debugPrint('saveStoryProgress failed (offline?): $e');
     }
   }
 
@@ -798,6 +801,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
       }
     });
 
+    if (!_pageControllerReady) return;
     await _pageController.animateToPage(
       _pathPos + 1,
       duration: const Duration(milliseconds: 260),

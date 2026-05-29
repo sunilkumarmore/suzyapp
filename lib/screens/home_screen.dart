@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:suzyapp/widgets/parent_gate_dialog.dart';
@@ -33,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ReadingProgress? _progress;
   bool _showHomeTour = false;
   String _appVersionLabel = '';
+  String _childName = 'Kiddo';
 
   @override
   void initState() {
@@ -40,6 +42,14 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadProgress();
     _loadHomeTour();
     _loadVersionLabel();
+    _loadChildName();
+  }
+
+  void _loadChildName() {
+    final name = FirebaseAuth.instance.currentUser?.displayName;
+    if (name != null && name.trim().isNotEmpty) {
+      setState(() => _childName = name.trim());
+    }
   }
 
   Future<void> _loadProgress() async {
@@ -119,7 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Align(alignment: Alignment.topRight, child: parentBtn),
                   const SizedBox(height: AppSpacing.small),
-                  const _Header(childName: 'Kiddo'),
+                  _Header(childName: _childName),
                   SizedBox(
                     height: isTablet ? AppSpacing.large : AppSpacing.medium,
                   ),
