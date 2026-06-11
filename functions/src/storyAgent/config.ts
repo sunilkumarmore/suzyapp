@@ -2,6 +2,7 @@ import { defineSecret, defineString } from "firebase-functions/params";
 
 // Secrets (set via: firebase functions:secrets:set <NAME>)
 export const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
+export const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 export const SENDGRID_API_KEY = defineSecret("SENDGRID_API_KEY");
 export const STORY_AGENT_SECRET = defineSecret("STORY_AGENT_SECRET");
 

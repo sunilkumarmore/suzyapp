@@ -5,6 +5,7 @@ import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 
 import {
   ANTHROPIC_API_KEY,
+  GEMINI_API_KEY,
   SENDGRID_API_KEY,
   STORY_AGENT_SECRET,
   STORY_APPROVAL_EMAIL,
@@ -34,7 +35,7 @@ export const storyProposalDaily = onSchedule(
   {
     schedule: "0 8 * * *",
     timeZone: "America/Chicago", // adjust to your local timezone
-    secrets: [ANTHROPIC_API_KEY, SENDGRID_API_KEY, STORY_AGENT_SECRET],
+    secrets: [ANTHROPIC_API_KEY, GEMINI_API_KEY, SENDGRID_API_KEY, STORY_AGENT_SECRET],
     timeoutSeconds: 540,
     memory: "1GiB",
   },
@@ -59,6 +60,7 @@ export const storyProposalDaily = onSchedule(
 
       // Character sketch (best effort — email goes out without it on failure).
       const sketchUrl = await generateAndUploadImage(
+        GEMINI_API_KEY.value(),
         proposal.heroSketchPrompt,
         `story_agent/proposals/${ref.id}/sketch.png`,
         "1:1"
@@ -176,7 +178,7 @@ export const storyApprove = onRequest(
 export const storyCompleteOnApproval = onDocumentUpdated(
   {
     document: `${PROPOSALS_COLLECTION}/{proposalId}`,
-    secrets: [ANTHROPIC_API_KEY],
+    secrets: [ANTHROPIC_API_KEY, GEMINI_API_KEY],
     timeoutSeconds: 540,
     memory: "1GiB",
   },
@@ -207,6 +209,7 @@ export const storyCompleteOnApproval = onDocumentUpdated(
 
       // Cover + one full-scene illustration per page (best effort each).
       const coverUrl = await generateAndUploadImage(
+        GEMINI_API_KEY.value(),
         story.coverScenePrompt,
         `story_agent/stories/${storyId}/cover.png`,
         "4:3"
@@ -216,6 +219,7 @@ export const storyCompleteOnApproval = onDocumentUpdated(
       for (let i = 0; i < story.pages.length; i++) {
         const p = story.pages[i];
         const backgroundUrl = await generateAndUploadImage(
+          GEMINI_API_KEY.value(),
           p.scenePrompt,
           `story_agent/stories/${storyId}/page_${i}.png`,
           "4:3"

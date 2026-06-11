@@ -1,36 +1,25 @@
 import * as admin from "firebase-admin";
 import { getDownloadURL } from "firebase-admin/storage";
-import { GoogleAuth } from "google-auth-library";
 import fetch from "node-fetch";
-import { PROJECT_ID } from "./config";
 
-// Imagen 3 via Vertex AI. Uses the function's own service account (ADC) —
-// requires the "Vertex AI User" role on the runtime service account.
+// Imagen 3 via the Gemini API (generativelanguage.googleapis.com).
+// Uses a plain API key from Google AI Studio — free tier supports up to
+// 1,500 requests/day, which covers all daily sketches + full story illustrations.
+// Get a key at: https://aistudio.google.com/apikey
 
 const IMAGEN_MODEL = "imagen-3.0-generate-002";
-const VERTEX_URL =
-  `https://us-central1-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}` +
-  `/locations/us-central1/publishers/google/models/${IMAGEN_MODEL}:predict`;
-
-const auth = new GoogleAuth({
-  scopes: ["https://www.googleapis.com/auth/cloud-platform"],
-});
+const GEMINI_IMAGEN_URL =
+  `https://generativelanguage.googleapis.com/v1beta/models/${IMAGEN_MODEL}:predict`;
 
 async function generateImageBase64(
+  apiKey: string,
   prompt: string,
   aspectRatio: "1:1" | "4:3"
 ): Promise<string | null> {
   try {
-    const authClient = await auth.getClient();
-    const accessToken = (await authClient.getAccessToken()).token;
-    if (!accessToken) return null;
-
-    const resp = await fetch(VERTEX_URL, {
+    const resp = await fetch(`${GEMINI_IMAGEN_URL}?key=${apiKey}`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         instances: [{ prompt }],
         parameters: {
@@ -77,11 +66,12 @@ async function uploadPng(base64: string, storagePath: string): Promise<string | 
  * continue without the image (the app renders a gradient fallback).
  */
 export async function generateAndUploadImage(
+  apiKey: string,
   prompt: string,
   storagePath: string,
   aspectRatio: "1:1" | "4:3" = "4:3"
 ): Promise<string | null> {
-  const base64 = await generateImageBase64(prompt, aspectRatio);
+  const base64 = await generateImageBase64(apiKey, prompt, aspectRatio);
   if (!base64) return null;
   return uploadPng(base64, storagePath);
 }
