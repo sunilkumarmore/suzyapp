@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { STORY_STUDIO_SYSTEM_PROMPT, buildProposalsUserPrompt, buildFullStoryUserPrompt } from "./prompts";
 import { proposalsSchema, fullStorySchema, StoryProposal, GeneratedStory } from "./schemas";
 
-const MODEL = "claude-opus-4-8";
+const MODEL = "claude-sonnet-4-6";
 
 function client(apiKey: string): Anthropic {
   return new Anthropic({ apiKey });
