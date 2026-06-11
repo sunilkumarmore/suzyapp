@@ -660,3 +660,12 @@ export const parentVoiceCreate = onRequest(
     }
   }
 );
+
+// ---------------------------------------------------------------------------
+// Story agent: daily proposals → email approval → auto-publish to /stories
+// ---------------------------------------------------------------------------
+export {
+  storyProposalDaily,
+  storyApprove,
+  storyCompleteOnApproval,
+} from "./storyAgent/storyAgent";
